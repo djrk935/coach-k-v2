@@ -76,13 +76,22 @@ def _text(content) -> str:
 
 class ChatIn(BaseModel):
     message: str
+    chat_id: str | None = None
+    images: list[str] = []  # data URLs (physique photos)
 
 
 @app.post("/api/chat")
 async def chat(body: ChatIn, request: Request):
     agent = request.app.state.agent
     user_id = await tools.get_or_create_user()
-    config = {"configurable": {"thread_id": user_id}}
+    chat_id = body.chat_id or await tools.create_chat(user_id)
+    await tools.maybe_title_chat(chat_id, body.message)
+    config = {"configurable": {"thread_id": f"{user_id}:{chat_id}"}}
+
+    content: str | list = body.message
+    if body.images:
+        content = [{"type": "text", "text": body.message or "Here are my physique photos."}]
+        content += [{"type": "image_url", "image_url": {"url": u}} for u in body.images]
 
     async def stream():
         program_id = None
@@ -90,7 +99,7 @@ async def chat(body: ChatIn, request: Request):
         final_text = ""
         try:
             async for mode, payload in agent.astream(
-                {"messages": [{"role": "user", "content": body.message}], "user_id": user_id},
+                {"messages": [{"role": "user", "content": content}], "user_id": user_id},
                 config=config,
                 stream_mode=["messages", "values"],
             ):
@@ -111,10 +120,78 @@ async def chat(body: ChatIn, request: Request):
                 yield f"data: {json.dumps({'type': 'token', 'text': final_text})}\n\n"
         except Exception as e:  # surface upstream failures (API, DB) to the client
             yield f"data: {json.dumps({'type': 'error', 'text': str(e)[:300]})}\n\n"
-        done = {"type": "done", **({"program_id": program_id} if program_id else {})}
+        done = {"type": "done", "chat_id": chat_id}
+        if program_id:
+            done["program_id"] = program_id
         yield f"data: {json.dumps(done)}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ===== Chats =====
+
+@app.post("/api/chats")
+async def new_chat():
+    user_id = await tools.get_or_create_user()
+    return {"id": await tools.create_chat(user_id)}
+
+
+@app.get("/api/chats")
+async def chats_index():
+    user_id = await tools.get_or_create_user()
+    return await tools.list_chats(user_id)
+
+
+@app.get("/api/chats/{chat_id}/messages")
+async def chat_messages(chat_id: str, request: Request):
+    user_id = await tools.get_or_create_user()
+    snap = await request.app.state.agent.aget_state(
+        {"configurable": {"thread_id": f"{user_id}:{chat_id}"}}
+    )
+    out = []
+    for m in (snap.values or {}).get("messages", []):
+        role = getattr(m, "type", "")
+        if role not in ("human", "ai"):
+            continue
+        text = _text(m.content)
+        if role == "human" and isinstance(m.content, list):
+            n = sum(1 for b in m.content if isinstance(b, dict) and b.get("type") == "image_url")
+            if n:
+                text = f"📷 {n} photo{'s' if n > 1 else ''} — {text}"
+        if text:
+            out.append({"role": "user" if role == "human" else "assistant", "text": text})
+    return out
+
+
+# ===== Profile (settings page) =====
+
+class ProfilePatch(BaseModel):
+    patch: dict
+
+
+@app.patch("/api/profile")
+async def patch_profile(body: ProfilePatch):
+    user_id = await tools.get_or_create_user()
+    merged = await tools.apply_profile_patch(user_id, body.patch, updated_by="user")
+    return {"profile": merged}
+
+
+# ===== Plan template gallery =====
+
+@app.get("/api/templates")
+async def templates():
+    from app.exercises.resolver import media_for
+    from app.plan_templates import TEMPLATES
+
+    out = []
+    for t in TEMPLATES:
+        t = json.loads(json.dumps(t))  # deep copy
+        for day in t["days"]:
+            for ex in day["exercises"]:
+                m = media_for(ex["name"])
+                ex["image_urls"] = m["image_urls"] if m else []
+        out.append(t)
+    return out
 
 
 class IngestIn(BaseModel):

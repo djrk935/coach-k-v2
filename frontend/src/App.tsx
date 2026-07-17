@@ -1,22 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { api, appKey, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
+import Settings from "./Settings";
+import Templates from "./Templates";
 
-type Msg = { role: "user" | "assistant"; text: string };
-type Program = { id: string; name: string; goal: string | null; created_at: string };
-type Dashboard = {
-  profile: Record<string, unknown>;
-  readiness: Array<Record<string, unknown> & { date: string }>;
-  load: { acwr: number | null; sessions_28d: number };
-  programs: Program[];
-};
-
-// Deployed instances gate /api behind APP_PASSWORD; the key lives in localStorage.
-const appKey = () => localStorage.getItem("coachk_key") ?? "";
-const api = (path: string, init: RequestInit = {}) =>
-  fetch(path, { ...init, headers: { ...(init.headers ?? {}), "x-app-key": appKey() } });
-const keyed = (url: string) =>
-  appKey() ? `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(appKey())}` : url;
-
-// Minimal markdown: **bold** + [links](url)
+// Minimal markdown: **bold** + [links](url); /api links get the auth key.
 function md(text: string) {
   const html = text
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -56,17 +43,8 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
-function acwrTone(acwr: number | null) {
-  if (acwr == null) return { label: "no data", cls: "text-mut" };
-  if (acwr > 1.5) return { label: "spike — back off", cls: "text-brand" };
-  if (acwr > 1.3) return { label: "elevated", cls: "text-amber-400" };
-  if (acwr < 0.8) return { label: "detraining", cls: "text-sky-400" };
-  return { label: "in the zone", cls: "text-emerald-400" };
-}
-
 type FormMedia = { matched: string; image_urls: string[]; instructions: string[] };
 
-// Two start/end frames flipped on a timer — GIF feel, zero GIFs.
 function FormLookup() {
   const [q, setQ] = useState("");
   const [media, setMedia] = useState<FormMedia | null>(null);
@@ -90,9 +68,7 @@ function FormLookup() {
 
   return (
     <section className="rounded-xl bg-panel p-4">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
-        Form Check
-      </h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Form Check</h3>
       <div className="flex gap-2">
         <input
           value={q}
@@ -125,13 +101,27 @@ function FormLookup() {
   );
 }
 
+function acwrTone(acwr: number | null) {
+  if (acwr == null) return { label: "building baseline", cls: "text-mut" };
+  if (acwr > 1.5) return { label: "spike — back off", cls: "text-brand" };
+  if (acwr > 1.3) return { label: "elevated", cls: "text-amber-400" };
+  if (acwr < 0.8) return { label: "detraining", cls: "text-sky-400" };
+  return { label: "in the zone", cls: "text-emerald-400" };
+}
+
 export default function App() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [locked, setLocked] = useState(false);
+  const [chats, setChats] = useState<ChatMeta[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [view, setView] = useState<"chat" | "templates">("chat");
+  const [showSettings, setShowSettings] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const refreshDash = () =>
     api("/api/dashboard")
@@ -141,21 +131,66 @@ export default function App() {
       })
       .catch(() => {});
 
-  useEffect(() => { refreshDash(); }, []);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+  const loadChats = async () => {
+    const r = await api("/api/chats");
+    if (!r.ok) return;
+    const list: ChatMeta[] = await r.json();
+    setChats(list);
+    if (!chatId && list[0]) selectChat(list[0].id);
+  };
+
+  async function selectChat(id: string) {
+    setChatId(id);
+    setView("chat");
+    const r = await api(`/api/chats/${id}/messages`);
+    setMsgs(r.ok ? await r.json() : []);
+  }
+
+  async function newChat() {
+    const r = await api("/api/chats", { method: "POST" });
+    if (!r.ok) return;
+    const { id } = await r.json();
+    setChats((c) => [{ id, title: "New chat", created_at: "" }, ...c]);
+    setChatId(id);
+    setMsgs([]);
+    setView("chat");
+  }
+
+  useEffect(() => {
+    refreshDash();
+    loadChats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
+
+  async function attach(files: FileList | null) {
+    if (!files) return;
+    const urls: string[] = [];
+    for (const f of Array.from(files).slice(0, 4 - images.length)) {
+      urls.push(await fileToDataUrl(f));
+    }
+    setImages((im) => [...im, ...urls]);
+  }
 
   async function send() {
     const message = input.trim();
-    if (!message || busy) return;
+    if ((!message && !images.length) || busy) return;
+    const sent = images;
     setInput("");
+    setImages([]);
     setBusy(true);
-    setMsgs((m) => [...m, { role: "user", text: message }, { role: "assistant", text: "" }]);
+    const shown = sent.length
+      ? `📷 ${sent.length} photo${sent.length > 1 ? "s" : ""} — ${message}`.trim()
+      : message;
+    setMsgs((m) => [...m, { role: "user", text: shown }, { role: "assistant", text: "" }]);
 
     try {
       const res = await api("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, chat_id: chatId, images: sent }),
       });
       if (res.status === 401) {
         setLocked(true);
@@ -185,6 +220,12 @@ export default function App() {
               return copy;
             });
           }
+          if (ev.type === "done" && ev.chat_id) {
+            if (!chatId) setChatId(ev.chat_id);
+            api("/api/chats").then((r) => {
+              if (r.ok) r.json().then(setChats);
+            });
+          }
         }
       }
     } catch {
@@ -195,87 +236,166 @@ export default function App() {
     }
   }
 
-  const today = dash?.readiness?.[0];
-  const acwr = dash?.load?.acwr ?? null;
-  const tone = acwrTone(acwr);
-  const oneRms = (dash?.profile?.one_rms ?? {}) as Record<string, number>;
-
   if (locked) {
     return (
       <LockScreen
         onUnlock={() => {
           setLocked(false);
           refreshDash();
+          loadChats();
         }}
       />
     );
   }
 
+  const today = dash?.readiness?.[0];
+  const acwr = dash?.load?.acwr ?? null;
+  const tone = acwrTone(acwr);
+  const profile = dash?.profile ?? {};
+  const oneRms = ((profile as Record<string, unknown>).lifts_1rm ??
+    (profile as Record<string, unknown>).one_rms ??
+    {}) as Record<string, number>;
+
   return (
     <div className="flex h-full">
-      {/* ===== Chat ===== */}
+      {/* ===== Main column ===== */}
       <main className="flex flex-1 flex-col">
-        <header className="border-b border-line px-6 py-4">
+        <header className="flex items-center gap-3 border-b border-line px-4 py-3">
           <span className="font-black tracking-[0.3em] text-brand">COACH K</span>
-          <span className="ml-3 text-xs text-mut">science-grounded strength coaching</span>
+          <select
+            value={chatId ?? ""}
+            onChange={(e) => selectChat(e.target.value)}
+            className="max-w-40 rounded-lg border border-line bg-panel px-2 py-1.5 text-xs outline-none"
+          >
+            {chats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={newChat}
+            className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
+          >
+            + New
+          </button>
+          <div className="flex-1" />
+          <button
+            onClick={() => setView(view === "chat" ? "templates" : "chat")}
+            className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+              view === "templates" ? "bg-brand text-white" : "border border-line hover:border-brand"
+            }`}
+          >
+            Templates
+          </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
+            title="Settings"
+          >
+            ⚙
+          </button>
         </header>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
-          {msgs.length === 0 && (
-            <div className="mt-24 text-center text-mut">
-              <p className="text-lg">What are we training for?</p>
-              <p className="mt-2 text-sm">
-                Ask for a program, log a session, or just check in.
-              </p>
+        {view === "templates" ? (
+          <Templates
+            onPersonalize={(name) => {
+              setView("chat");
+              setInput(
+                `Personalize the "${name}" template for me — adapt it to my profile, 1RMs, and readiness, then generate the program.`,
+              );
+            }}
+          />
+        ) : (
+          <>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+              {msgs.length === 0 && (
+                <div className="mt-24 text-center text-mut">
+                  <p className="text-lg">What are we training for?</p>
+                  <p className="mt-2 text-sm">
+                    Ask for a program, log a session, check in — or attach physique photos with 📎 for
+                    an honest assessment.
+                  </p>
+                </div>
+              )}
+              {msgs.map((m, i) => (
+                <div key={i} className={m.role === "user" ? "flex justify-end" : "flex"}>
+                  <div
+                    className={
+                      m.role === "user"
+                        ? "max-w-[70%] rounded-2xl rounded-br-sm bg-brand/90 px-4 py-2.5 text-white"
+                        : "max-w-[85%] rounded-2xl rounded-bl-sm bg-panel px-4 py-2.5"
+                    }
+                    dangerouslySetInnerHTML={md(m.text || (busy && i === msgs.length - 1 ? "…" : ""))}
+                  />
+                </div>
+              ))}
+              <div ref={bottomRef} />
             </div>
-          )}
-          {msgs.map((m, i) => (
-            <div key={i} className={m.role === "user" ? "flex justify-end" : "flex"}>
-              <div
-                className={
-                  m.role === "user"
-                    ? "max-w-[70%] rounded-2xl rounded-br-sm bg-brand/90 px-4 py-2.5 text-white"
-                    : "max-w-[85%] rounded-2xl rounded-bl-sm bg-panel px-4 py-2.5"
-                }
-                dangerouslySetInnerHTML={md(m.text || (busy && i === msgs.length - 1 ? "…" : ""))}
-              />
-            </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
 
-        <footer className="border-t border-line p-4">
-          <div className="flex gap-2">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder="Log a session, ask for a program, report how you feel…"
-              className="flex-1 rounded-xl border border-line bg-panel px-4 py-3 outline-none placeholder:text-mut focus:border-brand"
-            />
-            <button
-              onClick={send}
-              disabled={busy}
-              className="rounded-xl bg-brand px-5 font-semibold text-white disabled:opacity-40"
-            >
-              Send
-            </button>
-          </div>
-        </footer>
+            <footer className="border-t border-line p-4">
+              {images.length > 0 && (
+                <div className="mb-2 flex gap-2">
+                  {images.map((u, i) => (
+                    <div key={i} className="relative">
+                      <img src={u} className="h-14 w-14 rounded-lg object-cover" />
+                      <button
+                        onClick={() => setImages(images.filter((_, j) => j !== i))}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    attach(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  title="Attach physique photos"
+                  className="rounded-xl border border-line px-3 text-lg hover:border-brand"
+                >
+                  📎
+                </button>
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
+                  placeholder="Log a session, ask for a program, attach photos…"
+                  className="flex-1 rounded-xl border border-line bg-panel px-4 py-3 outline-none placeholder:text-mut focus:border-brand"
+                />
+                <button
+                  onClick={send}
+                  disabled={busy}
+                  className="rounded-xl bg-brand px-5 font-semibold text-white disabled:opacity-40"
+                >
+                  Send
+                </button>
+              </div>
+            </footer>
+          </>
+        )}
       </main>
 
       {/* ===== Sidebar ===== */}
       <aside className="hidden w-80 flex-col gap-4 overflow-y-auto border-l border-line p-5 lg:flex">
         <section className="rounded-xl bg-panel p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
-            Training Load
-          </h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Training Load</h3>
           <div className="text-3xl font-black">
             {acwr ?? "—"} <span className={`text-sm font-semibold ${tone.cls}`}>{tone.label}</span>
           </div>
-          <p className="mt-1 text-xs text-mut">
-            ACWR · {dash?.load?.sessions_28d ?? 0} sessions / 28d
-          </p>
+          <p className="mt-1 text-xs text-mut">ACWR · {dash?.load?.sessions_28d ?? 0} sessions / 28d</p>
         </section>
 
         <section className="rounded-xl bg-panel p-4">
@@ -300,9 +420,7 @@ export default function App() {
 
         {Object.keys(oneRms).length > 0 && (
           <section className="rounded-xl bg-panel p-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
-              1RMs
-            </h3>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">1RMs</h3>
             <ul className="space-y-1 text-sm">
               {Object.entries(oneRms).map(([lift, kg]) => (
                 <li key={lift} className="flex justify-between">
@@ -317,9 +435,7 @@ export default function App() {
         <FormLookup />
 
         <section className="rounded-xl bg-panel p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
-            Programs
-          </h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Programs</h3>
           {dash?.programs?.length ? (
             <ul className="space-y-2">
               {dash.programs.map((p) => (
@@ -342,6 +458,14 @@ export default function App() {
           )}
         </section>
       </aside>
+
+      {showSettings && (
+        <Settings
+          profile={profile as Record<string, unknown>}
+          onClose={() => setShowSettings(false)}
+          onSaved={refreshDash}
+        />
+      )}
     </div>
   );
 }

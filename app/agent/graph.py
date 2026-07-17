@@ -1,5 +1,11 @@
 """The decision loop: route → load_state → (retrieve) → act → update_memory."""
 
+import json
+from base64 import b64decode
+from datetime import date
+from pathlib import Path
+from uuid import uuid4
+
 from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -8,7 +14,9 @@ from app.agent import prompts, tools
 from app.agent.state import AgentState
 from app.config import settings
 from app.retrieval.search import format_hits_for_prompt, hybrid_search
-from app.schemas import MemoryDelta, WorkoutPlan
+from app.schemas import MemoryDelta, PhysiqueAssessment, WorkoutPlan
+
+PHOTOS_DIR = Path(__file__).parent.parent.parent / "photos"
 
 _llm = ChatAnthropic(
     model=settings.chat_model, api_key=settings.anthropic_api_key, max_tokens=8192
@@ -27,7 +35,16 @@ def _text(content) -> str:
     return "".join(b.get("text", "") for b in content if isinstance(b, dict))
 
 
+def _image_blocks(content) -> list[dict]:
+    if not isinstance(content, list):
+        return []
+    return [b for b in content if isinstance(b, dict) and b.get("type") == "image_url"]
+
+
 async def route(state: AgentState) -> dict:
+    # Photos attached → physique analysis, no classifier call needed.
+    if _image_blocks(state["messages"][-1].content):
+        return {"intent": "physique"}
     res = await _fast.ainvoke(
         [{"role": "system", "content": prompts.ROUTER}, state["messages"][-1]]
     )
@@ -86,6 +103,52 @@ async def act(state: AgentState) -> dict:
             "messages": [{"role": "assistant", "content": ack}],
         }
 
+    if state["intent"] == "physique":
+        # 1. Persist the photos locally (private; gitignored dir).
+        PHOTOS_DIR.mkdir(exist_ok=True)
+        paths = []
+        for block in _image_blocks(state["messages"][-1].content):
+            header, _, b64 = block["image_url"]["url"].partition(",")
+            ext = "png" if "png" in header else "jpg"
+            p = PHOTOS_DIR / f"{date.today()}-{uuid4().hex[:8]}.{ext}"
+            p.write_bytes(b64decode(b64))
+            paths.append(str(p))
+
+        # 2. Assess with vision + prior history for a real progress comparison.
+        history = await tools.get_physique_history(state["user_id"])
+        msgs = [
+            {"role": "system", "content": prompts.PHYSIQUE_SYSTEM},
+            {"role": "system", "content": ctx},
+        ]
+        if history:
+            msgs.append({
+                "role": "system",
+                "content": "PRIOR ASSESSMENTS (newest first):\n" + json.dumps(history),
+            })
+        structured = _llm.with_structured_output(PhysiqueAssessment)
+        a: PhysiqueAssessment = await structured.ainvoke([*msgs, *state["messages"]])
+
+        # 3. Persist + fold into the profile so programming sees it.
+        await tools.save_physique_assessment(state["user_id"], paths, a.model_dump())
+        await tools.apply_profile_patch(state["user_id"], {"physique": {
+            "last_assessed": str(date.today()),
+            "estimated_bodyfat_range": a.estimated_bodyfat_range,
+            "strong_points": a.strong_points,
+            "lagging_points": a.lagging_points,
+        }})
+
+        lines = [a.overall, "", f"**Est. body fat:** {a.estimated_bodyfat_range}"]
+        if a.strong_points:
+            lines.append("**Standing out:** " + ", ".join(a.strong_points))
+        if a.lagging_points:
+            lines.append("**Priority targets:** " + ", ".join(a.lagging_points))
+        if a.posture_notes:
+            lines.append(f"**Posture:** {a.posture_notes}")
+        if a.vs_previous:
+            lines += ["", f"**Since last photos:** {a.vs_previous}"]
+        lines += ["", a.training_implications]
+        return {"messages": [{"role": "assistant", "content": "\n".join(lines)}]}
+
     if state["intent"] == "log":
         # Parse + persist FIRST so the ack reflects real results (PRs, flags).
         structured = _fast.with_structured_output(MemoryDelta)
@@ -123,7 +186,7 @@ async def act(state: AgentState) -> dict:
 
 
 async def update_memory(state: AgentState) -> dict:
-    if state["intent"] == "log":
+    if state["intent"] in ("log", "physique"):
         return {}  # already persisted in act()
     structured = _fast.with_structured_output(MemoryDelta)
     delta: MemoryDelta = await structured.ainvoke(

@@ -66,6 +66,26 @@ class WorkoutPlan(BaseModel):
     citations: list[Citation]
 
 
+# ===== Physique photo analysis =====
+
+class PhysiqueAssessment(BaseModel):
+    """Honest, constructive read of physique photos. Ranges, never precision."""
+
+    overall: str = Field(..., description="2-3 sentence honest overall read, coach's voice")
+    estimated_bodyfat_range: str = Field(
+        ..., description="A RANGE with a hedge, e.g. 'roughly 15-18% (photo-based estimate)'"
+    )
+    strong_points: list[str] = Field(..., description="Muscle groups / traits that stand out")
+    lagging_points: list[str] = Field(..., description="What to prioritize, said constructively")
+    posture_notes: str | None = Field(None, description="Only if clearly visible")
+    vs_previous: str | None = Field(
+        None, description="Comparison to prior assessments when provided, else null"
+    )
+    training_implications: str = Field(
+        ..., description="How this shapes programming: volume allocation, exercise emphasis"
+    )
+
+
 # ===== Evolving memory (extracted from conversation) =====
 
 class ReadinessEntry(BaseModel):

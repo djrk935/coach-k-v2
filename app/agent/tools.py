@@ -25,11 +25,15 @@ async def get_or_create_user(email: str = DEFAULT_EMAIL) -> str:
 # ===== Profile (append-only versions) =====
 
 def _merge(base: dict, patch: dict) -> dict:
-    """One-level-deep merge so nested objects (e.g. one_rms) accrete, not clobber."""
+    """One-level-deep merge so nested objects (e.g. lifts_1rm) accrete, not clobber.
+    None values in a patch are ignored — extraction models emit them for
+    'unchanged', and null must never erase a known fact."""
     out = dict(base)
     for k, v in patch.items():
+        if v is None:
+            continue
         if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = {**out[k], **v}
+            out[k] = {**out[k], **{ik: iv for ik, iv in v.items() if iv is not None}}
         else:
             out[k] = v
     return out
@@ -208,6 +212,68 @@ async def list_programs(user_id: str) -> list[dict]:
             user_id,
         )
     return [dict(r) | {"created_at": str(r["created_at"])} for r in rows]
+
+
+# ===== Chats (thread index; conversation state lives in checkpoints) =====
+
+async def create_chat(user_id: str, title: str = "New chat") -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        cid = await conn.fetchval(
+            "INSERT INTO chats (user_id, title) VALUES ($1, $2) RETURNING id",
+            user_id, title,
+        )
+    return str(cid)
+
+
+async def list_chats(user_id: str) -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT id::text, title, created_at FROM chats
+               WHERE user_id = $1 ORDER BY created_at DESC""",
+            user_id,
+        )
+    return [dict(r) | {"created_at": str(r["created_at"])} for r in rows]
+
+
+async def maybe_title_chat(chat_id: str, first_message: str) -> None:
+    """First real message names the chat (only while it still has the default)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE chats SET title = $2 WHERE id = $1 AND title = 'New chat'",
+            chat_id, first_message.strip()[:60] or "New chat",
+        )
+
+
+# ===== Physique assessments =====
+
+async def save_physique_assessment(
+    user_id: str, file_paths: list[str], assessment: dict
+) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        for p in file_paths or [""]:
+            await conn.execute(
+                """INSERT INTO physique_photos (user_id, file_path, assessment)
+                   VALUES ($1, $2, $3)""",
+                user_id, p, json.dumps(assessment),
+            )
+
+
+async def get_physique_history(user_id: str, limit: int = 3) -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT DISTINCT ON (taken_at::date) taken_at, assessment
+               FROM physique_photos WHERE user_id = $1 AND assessment IS NOT NULL
+               ORDER BY taken_at::date DESC, taken_at DESC LIMIT $2""",
+            user_id, limit,
+        )
+    return [
+        {"date": str(r["taken_at"])[:10], **json.loads(r["assessment"])} for r in rows
+    ]
 
 
 # ===== Memory delta application =====
