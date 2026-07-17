@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+*.tsbuildinfo
+.pytest_cache/
+.ruff_cache/
+library/

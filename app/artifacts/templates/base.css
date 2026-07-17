@@ -1,0 +1,54 @@
+/* Coach K brand — dark, red accent, CSS Paged Media for WeasyPrint */
+
+@page {
+  size: A4;
+  margin: 18mm 14mm 20mm 14mm;
+  background: #0b0b0d;
+
+  @bottom-left { content: "COACH K"; color: #e11d2e; font: 700 8pt "Helvetica Neue", Arial, sans-serif; letter-spacing: 2px; }
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); color: #6b6b73; font: 8pt "Helvetica Neue", Arial, sans-serif; }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font: 10pt/1.55 "Helvetica Neue", Arial, sans-serif;
+  color: #e7e7ea;
+}
+
+/* ===== Cover header ===== */
+.cover { margin-bottom: 10mm; border-bottom: 2px solid #e11d2e; padding-bottom: 6mm; }
+.brand { color: #e11d2e; font-weight: 700; letter-spacing: 4px; font-size: 9pt; margin-bottom: 3mm; }
+.cover h1 { font-size: 24pt; font-weight: 800; line-height: 1.15; margin-bottom: 5mm; }
+
+.meta { display: flex; gap: 8mm; }
+.meta div { font-size: 10.5pt; font-weight: 600; }
+.meta span { display: block; color: #8a8a92; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 400; margin-bottom: 1mm; }
+
+/* ===== Training days ===== */
+.day { margin-bottom: 8mm; break-inside: avoid; }
+.day h2 { font-size: 13pt; color: #ffffff; margin-bottom: 1mm; }
+.day .focus { color: #e11d2e; font-size: 9pt; font-weight: 600; margin-bottom: 3mm; }
+
+table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+thead th {
+  text-align: left; color: #8a8a92; text-transform: uppercase; letter-spacing: 1px;
+  font-size: 7pt; padding: 2mm 2mm; border-bottom: 1px solid #2a2a30;
+}
+tbody td { padding: 2.2mm 2mm; border-bottom: 0.5pt solid #1c1c21; vertical-align: top; }
+tbody tr:nth-child(even) { background: #131317; }
+td.ex { font-weight: 600; color: #ffffff; }
+th.ex, td.ex { width: 26%; }
+th.notes, td.notes { width: 24%; color: #a9a9b1; }
+
+/* ===== Prose blocks ===== */
+.block { margin-bottom: 7mm; break-inside: avoid; }
+.block h2 { font-size: 11.5pt; color: #e11d2e; margin-bottom: 2mm; }
+.block p + h2 { margin-top: 5mm; }
+.block p { color: #cfcfd6; }
+
+.rationale p { font-size: 9.5pt; }
+
+.citations ol { padding-left: 5mm; }
+.citations li { margin-bottom: 1.5mm; color: #a9a9b1; font-size: 8.5pt; }
+.citations strong { color: #e7e7ea; }

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="base.css" />
+  <title>{{ plan.program_name }}</title>
+</head>
+<body>
+
+  <header class="cover">
+    <div class="brand">COACH K</div>
+    <h1>{{ plan.program_name }}</h1>
+    <div class="meta">
+      <div><span>Goal</span>{{ plan.goal | title }}</div>
+      <div><span>Length</span>{{ plan.mesocycle_weeks }} weeks</div>
+      <div><span>Model</span>{{ plan.periodization_model }}</div>
+      {% if created_at %}<div><span>Issued</span>{{ created_at[:10] }}</div>{% endif %}
+    </div>
+  </header>
+
+  {% for day in plan.weekly_split %}
+  <section class="day">
+    <h2>{{ day.day_label }}</h2>
+    <p class="focus">{{ day.focus }}</p>
+    <table>
+      <thead>
+        <tr>
+          <th class="ex">Exercise</th><th>Sets</th><th>Reps</th>
+          <th>Intensity</th><th>Tempo</th><th>Rest</th><th class="notes">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in day.exercises %}
+        <tr>
+          <td class="ex">{{ ex.exercise }}</td>
+          <td>{{ ex.sets }}</td>
+          <td>{{ ex.reps }}</td>
+          <td>{{ ex.intensity }}</td>
+          <td>{{ ex.tempo or "—" }}</td>
+          <td>{{ (ex.rest_s ~ "s") if ex.rest_s else "—" }}</td>
+          <td class="notes">{{ ex.notes or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endfor %}
+
+  <section class="block">
+    <h2>Progression</h2>
+    <p>{{ plan.progression_scheme }}</p>
+    <h2>Deload Protocol</h2>
+    <p>{{ plan.deload_protocol }}</p>
+  </section>
+
+  <section class="block rationale">
+    <h2>Why This Program</h2>
+    <p>{{ plan.scientific_rationale }}</p>
+  </section>
+
+  {% if plan.citations %}
+  <section class="block citations">
+    <h2>Sources</h2>
+    <ol>
+      {% for c in plan.citations %}
+      <li>
+        <strong>{{ c.book }}</strong>{% if c.page %}, p.{{ c.page }}{% endif %}
+        — {{ c.principle }}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
+</body>
+</html>
