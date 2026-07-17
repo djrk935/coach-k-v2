@@ -13,10 +13,10 @@ dependencies = [
     # Agent loop
     "langgraph>=0.2",
     "langchain-anthropic>=0.3",
-    # Ingestion (parsing + embeddings)
+    # Ingestion (parsing + local embeddings)
     "llama-index-core>=0.12",
     "llama-parse>=0.5",
-    "llama-index-embeddings-openai>=0.3",
+    "fastembed>=0.4",
     # Artifacts
     "jinja2>=3.1",
     "weasyprint>=63",

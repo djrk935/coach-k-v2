@@ -1,16 +1,9 @@
 """Hybrid retrieval: pgvector ANN + metadata filters + content-type boost."""
 
 from pgvector import Vector
-from llama_index.embeddings.openai import OpenAIEmbedding
 
-from app.config import settings
 from app.db import get_pool
-
-_embed = OpenAIEmbedding(
-    model=settings.embed_model,
-    dimensions=settings.embed_dim,
-    api_key=settings.openai_api_key,
-)
+from app.retrieval.embedder import embed_query
 
 # Soft boost: prefer_type chunks rank ~0.05 cosine-distance closer, but
 # other types still surface if clearly more relevant.
@@ -33,7 +26,7 @@ async def hybrid_search(
     prefer_type: str | None = None,  # 'table' for programming, None for Q&A
     book: str | None = None,
 ) -> list[dict]:
-    vec = await _embed.aget_text_embedding(query)
+    vec = await embed_query(query)
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(_SEARCH_SQL, Vector(vec), prefer_type, k, book)

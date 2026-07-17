@@ -11,11 +11,11 @@ from pathlib import Path
 
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_parse import LlamaParse
 
 from app.config import settings
 from app.db import get_pool
+from app.retrieval.embedder import embed_passages
 
 # A markdown pipe-table: header row, separator row, 1+ data rows.
 _TABLE_RE = re.compile(r"(?:^\|.+\|\s*$\n?){2,}", re.MULTILINE)
@@ -77,8 +77,12 @@ async def ingest_pdf(path: Path, title: str, author: str | None = None) -> str:
     # 2. Chunk, tracking page + section for citation quality.
     records: list[tuple[str, str, int | None, dict]] = []  # (type, content, page, meta)
     section = ""
-    for page in pages:
-        page_num = page.metadata.get("page_number") or page.metadata.get("page_label")
+    for page_idx, page in enumerate(pages, start=1):
+        raw = page.metadata.get("page_number") or page.metadata.get("page_label") or page_idx
+        try:
+            page_num = int(raw)
+        except (TypeError, ValueError):
+            page_num = page_idx
         for content_type, content in _split_page(page.text):
             if heading := re.search(r"^#{1,3} (.+)$", content, re.MULTILINE):
                 section = heading.group(1).strip()
@@ -87,13 +91,8 @@ async def ingest_pdf(path: Path, title: str, author: str | None = None) -> str:
                 meta["table_data"] = content  # verbatim markdown grid
             records.append((content_type, content, page_num, meta))
 
-    # 3. Embed in batches.
-    embed = OpenAIEmbedding(
-        model=settings.embed_model,
-        dimensions=settings.embed_dim,
-        api_key=settings.openai_api_key,
-    )
-    vectors = await embed.aget_text_embedding_batch([r[1] for r in records])
+    # 3. Embed locally in batches.
+    vectors = await embed_passages([r[1] for r in records])
 
     # 4. Persist atomically.
     async with pool.acquire() as conn, conn.transaction():

@@ -85,7 +85,7 @@ CREATE TABLE doc_chunks (
     content_type TEXT NOT NULL,   -- 'prose' | 'table' | 'figure_caption'
     page_start   INT,
     metadata     JSONB NOT NULL DEFAULT '{}',  -- section path, book, table_data
-    embedding    vector(1536) NOT NULL,
+    embedding    vector(768) NOT NULL,
     UNIQUE (document_id, chunk_index)
 );
 

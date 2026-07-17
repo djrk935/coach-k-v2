@@ -11,8 +11,8 @@ class Settings(BaseSettings):
 
     chat_model: str = "claude-opus-4-8"
     fast_model: str = "claude-haiku-4-5-20251001"  # router + memory extraction
-    embed_model: str = "text-embedding-3-small"
-    embed_dim: int = 1536
+    embed_model: str = "BAAI/bge-base-en-v1.5"  # local via fastembed — free, private
+    embed_dim: int = 768
 
 
 settings = Settings()
