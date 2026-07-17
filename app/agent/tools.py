@@ -155,12 +155,22 @@ async def get_load_summary(user_id: str) -> dict:
     today = date.today()
     acute = sum(float(r["load"]) for r in rows if (today - r["day"]).days < 7) / 7
     chronic = sum(float(r["load"]) for r in rows) / 28
-    return {
+
+    # ACWR is only meaningful once a real chronic baseline exists. With 1-2
+    # sessions the ratio is a pure artifact (a lone session always yields
+    # 28/7 = 4.0), which reads as a false overtraining alarm. Gate it behind
+    # ~2 weeks of history and enough sessions to average against.
+    span_days = (today - min((r["day"] for r in rows), default=today)).days
+    baselined = span_days >= 14 and len(rows) >= 4
+    out = {
         "sessions_28d": len(rows),
         "acute_daily_load": round(acute, 1),
         "chronic_daily_load": round(chronic, 1),
-        "acwr": round(acute / chronic, 2) if chronic else None,
+        "acwr": round(acute / chronic, 2) if (baselined and chronic) else None,
     }
+    if not baselined:
+        out["load_note"] = "building baseline — ACWR needs ~2 weeks of logged training"
+    return out
 
 
 # ===== Programs =====

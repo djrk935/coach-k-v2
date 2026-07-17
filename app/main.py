@@ -5,21 +5,28 @@ import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from pydantic import BaseModel
 
 from app.agent import tools
-from app.agent.graph import agent
+from app.agent.graph import build_graph
 from app.artifacts.renderer import render_program_pdf
+from app.config import settings
 from app.db import close_pool
 from app.ingestion.pipeline import ingest_pdf
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
-    yield
+async def lifespan(app: FastAPI):
+    # Durable per-user chat memory: the Postgres saver survives restarts, so
+    # Coach K resumes a conversation mid-thread instead of forgetting it.
+    async with AsyncPostgresSaver.from_conn_string(settings.database_url) as saver:
+        await saver.setup()  # idempotent: creates checkpoint tables if absent
+        app.state.agent = build_graph(saver)
+        yield
     await close_pool()
 
 
@@ -43,7 +50,8 @@ class ChatIn(BaseModel):
 
 
 @app.post("/api/chat")
-async def chat(body: ChatIn):
+async def chat(body: ChatIn, request: Request):
+    agent = request.app.state.agent
     user_id = await tools.get_or_create_user()
     config = {"configurable": {"thread_id": user_id}}
 

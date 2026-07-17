@@ -12,6 +12,8 @@ dependencies = [
     "pydantic-settings>=2.6",
     # Agent loop
     "langgraph>=0.2",
+    "langgraph-checkpoint-postgres>=2.0",
+    "psycopg[binary]>=3.2",
     "langchain-anthropic>=0.3",
     # Ingestion (parsing + local embeddings)
     "llama-index-core>=0.12",

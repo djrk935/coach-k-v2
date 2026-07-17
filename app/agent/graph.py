@@ -1,7 +1,7 @@
 """The decision loop: route → load_state → (retrieve) → act → update_memory."""
 
 from langchain_anthropic import ChatAnthropic
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from app.agent import prompts, tools
@@ -141,7 +141,7 @@ def _needs_sources(state: AgentState) -> str:
     return "retrieve" if state["intent"] in ("program_request", "coaching_qa") else "act"
 
 
-def build_graph():
+def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     g = StateGraph(AgentState)
     g.add_node("route", route)
     g.add_node("load_state", load_state)
@@ -155,8 +155,7 @@ def build_graph():
     g.add_edge("retrieve", "act")
     g.add_edge("act", "update_memory")
     g.add_edge("update_memory", END)
-    # MemorySaver keeps per-user chat history across turns (thread_id = user_id).
-    return g.compile(checkpointer=MemorySaver())
-
-
-agent = build_graph()
+    # The checkpointer persists per-user chat history across turns (thread_id =
+    # user_id). A Postgres saver (injected at startup) makes it survive restarts;
+    # None keeps it in-memory for tests.
+    return g.compile(checkpointer=checkpointer)
