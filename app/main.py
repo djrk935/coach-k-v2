@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from pydantic import BaseModel
@@ -34,10 +34,33 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Coach K v2", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Public paths when APP_PASSWORD gates the API: health probes and exercise
+# illustrations (open-source content; <img> tags can't send headers).
+_OPEN_PATHS = ("/api/health", "/api/exercise-images")
+
+
+@app.middleware("http")
+async def auth_guard(request: Request, call_next):
+    if (
+        settings.app_password
+        and request.url.path.startswith("/api")
+        and not request.url.path.startswith(_OPEN_PATHS)
+        and request.method != "OPTIONS"
+    ):
+        supplied = request.headers.get("x-app-key") or request.query_params.get("key")
+        if supplied != settings.app_password:
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+@app.get("/api/health")
+async def health():
+    return {"ok": True}
 
 # Self-hosted form illustrations (free-exercise-db) — start/end frames per lift.
 _MEDIA_IMAGES = Path(__file__).parent.parent / "exercise_media" / "images"
@@ -144,3 +167,10 @@ async def dashboard():
         "load": await tools.get_load_summary(user_id),
         "programs": await tools.list_programs(user_id),
     }
+
+
+# Production: serve the built frontend from the same process (no Vite proxy).
+# Mounted last so /api routes take precedence. Absent in local dev — harmless.
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")

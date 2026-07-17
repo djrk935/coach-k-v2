@@ -9,6 +9,13 @@ type Dashboard = {
   programs: Program[];
 };
 
+// Deployed instances gate /api behind APP_PASSWORD; the key lives in localStorage.
+const appKey = () => localStorage.getItem("coachk_key") ?? "";
+const api = (path: string, init: RequestInit = {}) =>
+  fetch(path, { ...init, headers: { ...(init.headers ?? {}), "x-app-key": appKey() } });
+const keyed = (url: string) =>
+  appKey() ? `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(appKey())}` : url;
+
 // Minimal markdown: **bold** + [links](url)
 function md(text: string) {
   const html = text
@@ -18,8 +25,35 @@ function md(text: string) {
       /\[(.+?)\]\((.+?)\)/g,
       '<a href="$2" target="_blank" class="text-brand underline">$1</a>',
     )
+    .replace(/href="(\/api\/[^"]+)"/g, (_m, p: string) => `href="${keyed(p)}"`)
     .replace(/\n/g, "<br/>");
   return { __html: html };
+}
+
+function LockScreen({ onUnlock }: { onUnlock: () => void }) {
+  const [pw, setPw] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95">
+      <div className="w-80 rounded-2xl bg-panel p-6">
+        <div className="mb-1 font-black tracking-[0.3em] text-brand">COACH K</div>
+        <p className="mb-4 text-sm text-mut">Enter the app password to continue.</p>
+        <input
+          type="password"
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && pw) {
+              localStorage.setItem("coachk_key", pw);
+              onUnlock();
+            }
+          }}
+          placeholder="Password"
+          autoFocus
+          className="w-full rounded-lg border border-line bg-ink px-3 py-2 outline-none focus:border-brand"
+        />
+      </div>
+    </div>
+  );
 }
 
 function acwrTone(acwr: number | null) {
@@ -49,7 +83,7 @@ function FormLookup() {
     if (!q.trim()) return;
     setErr("");
     setMedia(null);
-    const r = await fetch(`/api/exercises/${encodeURIComponent(q.trim())}/media`);
+    const r = await api(`/api/exercises/${encodeURIComponent(q.trim())}/media`);
     if (r.ok) setMedia(await r.json());
     else setErr("No form match — try a standard name like “Back Squat”.");
   }
@@ -96,10 +130,16 @@ export default function App() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [dash, setDash] = useState<Dashboard | null>(null);
+  const [locked, setLocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshDash = () =>
-    fetch("/api/dashboard").then((r) => r.json()).then(setDash).catch(() => {});
+    api("/api/dashboard")
+      .then((r) => {
+        if (r.status === 401) setLocked(true);
+        else return r.json().then(setDash);
+      })
+      .catch(() => {});
 
   useEffect(() => { refreshDash(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
@@ -112,11 +152,16 @@ export default function App() {
     setMsgs((m) => [...m, { role: "user", text: message }, { role: "assistant", text: "" }]);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await api("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
+      if (res.status === 401) {
+        setLocked(true);
+        setMsgs((m) => m.slice(0, -2));
+        return;
+      }
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -154,6 +199,17 @@ export default function App() {
   const acwr = dash?.load?.acwr ?? null;
   const tone = acwrTone(acwr);
   const oneRms = (dash?.profile?.one_rms ?? {}) as Record<string, number>;
+
+  if (locked) {
+    return (
+      <LockScreen
+        onUnlock={() => {
+          setLocked(false);
+          refreshDash();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full">
@@ -269,7 +325,7 @@ export default function App() {
               {dash.programs.map((p) => (
                 <li key={p.id}>
                   <a
-                    href={`/api/programs/${p.id}/pdf`}
+                    href={keyed(`/api/programs/${p.id}/pdf`)}
                     target="_blank"
                     className="block rounded-lg border border-line px-3 py-2 text-sm hover:border-brand"
                   >
