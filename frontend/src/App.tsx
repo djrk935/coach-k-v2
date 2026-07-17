@@ -68,12 +68,13 @@ export default function App() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const ev = JSON.parse(line.slice(6));
-          if (ev.type === "token") {
+          if (ev.type === "token" || ev.type === "error") {
+            const add = ev.type === "error" ? `⚠ ${ev.text}` : ev.text;
             setMsgs((m) => {
               const copy = [...m];
               copy[copy.length - 1] = {
                 role: "assistant",
-                text: copy[copy.length - 1].text + ev.text,
+                text: copy[copy.length - 1].text + add,
               };
               return copy;
             });

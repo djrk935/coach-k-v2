@@ -48,17 +48,20 @@ async def chat(body: ChatIn):
 
     async def stream():
         program_id = None
-        async for mode, payload in agent.astream(
-            {"messages": [{"role": "user", "content": body.message}], "user_id": user_id},
-            config=config,
-            stream_mode=["messages", "values"],
-        ):
-            if mode == "messages":
-                chunk, meta = payload
-                if meta.get("langgraph_node") == "act" and (text := _text(chunk.content)):
-                    yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
-            else:  # values — snapshot of full state
-                program_id = payload.get("program_id") or program_id
+        try:
+            async for mode, payload in agent.astream(
+                {"messages": [{"role": "user", "content": body.message}], "user_id": user_id},
+                config=config,
+                stream_mode=["messages", "values"],
+            ):
+                if mode == "messages":
+                    chunk, meta = payload
+                    if meta.get("langgraph_node") == "act" and (text := _text(chunk.content)):
+                        yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+                else:  # values — snapshot of full state
+                    program_id = payload.get("program_id") or program_id
+        except Exception as e:  # surface upstream failures (API, DB) to the client
+            yield f"data: {json.dumps({'type': 'error', 'text': str(e)[:300]})}\n\n"
         done = {"type": "done", **({"program_id": program_id} if program_id else {})}
         yield f"data: {json.dumps(done)}\n\n"
 
