@@ -19,6 +19,9 @@ createdb coachk && psql coachk -f migrations/001_init.sql
 cp .env.example .env            # fill ANTHROPIC_API_KEY + LLAMA_CLOUD_API_KEY
 # macOS: WeasyPrint needs pango — brew install pango
 
+# Exercise form illustrations (free-exercise-db, ~100MB, one-time)
+./scripts/fetch_exercise_media.sh
+
 # Ingest your library (embeddings run locally — no OpenAI key needed)
 uv run python -m app.ingestion.pipeline ~/library/supertraining.pdf "Supertraining" --author "Siff"
 

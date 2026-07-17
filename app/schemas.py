@@ -23,6 +23,12 @@ class SetPrescription(BaseModel):
     intensity: str = Field(..., description="'@75% 1RM', 'RPE 8', or '2 RIR'")
     tempo: str | None = None
     rest_s: int | None = None
+    set_type: str = Field(
+        "straight", description="'warmup' | 'straight' | 'superset' | 'finisher'"
+    )
+    superset_group: str | None = Field(
+        None, description="Exercises sharing a letter (e.g. 'A') are performed back-to-back"
+    )
     notes: str | None = None
 
 
@@ -30,6 +36,17 @@ class TrainingDay(BaseModel):
     day_label: str = Field(..., description="e.g. 'Day 1 — Lower (Strength)'")
     focus: str
     exercises: list[SetPrescription]
+
+
+class NutritionTargets(BaseModel):
+    """Daily targets to support the training goal. Coach's estimate off the
+    profile — labeled as guidance, not a meal plan."""
+
+    calories: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+    guidance: str = Field(..., description="1-3 sentences: timing, protein spread, hydration")
 
 
 class WorkoutPlan(BaseModel):
@@ -42,6 +59,9 @@ class WorkoutPlan(BaseModel):
     weekly_split: list[TrainingDay]
     progression_scheme: str
     deload_protocol: str
+    nutrition: NutritionTargets | None = Field(
+        None, description="Include when profile has enough info (bodyweight helps)"
+    )
     scientific_rationale: str = Field(..., description="Prose grounded ONLY in retrieved sources")
     citations: list[Citation]
 

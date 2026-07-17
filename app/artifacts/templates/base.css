@@ -41,6 +41,44 @@ td.ex { font-weight: 600; color: #ffffff; }
 th.ex, td.ex { width: 26%; }
 th.notes, td.notes { width: 24%; color: #a9a9b1; }
 
+/* ===== Split overview ===== */
+.overview { margin-bottom: 8mm; break-inside: avoid; }
+.overview h2 { font-size: 11.5pt; color: #e11d2e; margin-bottom: 2mm; }
+
+/* ===== Exercise cell: superset chips, badges, form frames ===== */
+.exname { font-weight: 600; color: #ffffff; }
+.ss {
+  display: inline-block; background: #e11d2e; color: #fff; font-weight: 800;
+  font-size: 7pt; border-radius: 1mm; padding: 0.4mm 1.4mm; margin-right: 1.2mm;
+}
+.badge {
+  display: inline-block; font-size: 6.5pt; text-transform: uppercase;
+  letter-spacing: 1px; color: #0b0b0d; background: #8a8a92;
+  border-radius: 1mm; padding: 0.3mm 1.4mm; margin-top: 0.8mm;
+}
+.badge-warmup { background: #58a6ff; }
+.badge-superset { background: #f0b429; }
+.badge-finisher { background: #e11d2e; color: #fff; }
+.frames { margin-top: 1.5mm; }
+.frames img {
+  height: 14mm; border-radius: 1.5mm; margin-right: 1.5mm;
+  background: #fff; border: 0.5pt solid #2a2a30;
+}
+.legend { color: #8a8a92; font-size: 7.5pt; margin-top: 1.5mm; }
+
+/* ===== Nutrition targets ===== */
+.nutrition .macros { display: flex; gap: 4mm; margin-bottom: 3mm; }
+.nutrition .macros div {
+  flex: 1; background: #131317; border: 0.5pt solid #2a2a30; border-radius: 2mm;
+  padding: 3mm; font-size: 13pt; font-weight: 800; color: #fff; text-align: center;
+}
+.nutrition .macros span {
+  display: block; color: #8a8a92; font-size: 7pt; text-transform: uppercase;
+  letter-spacing: 1.5px; font-weight: 400; margin-bottom: 1mm;
+}
+
+.microcredit { color: #55555c; font-size: 6.5pt; margin-top: 4mm; }
+
 /* ===== Prose blocks ===== */
 .block { margin-bottom: 7mm; break-inside: avoid; }
 .block h2 { font-size: 11.5pt; color: #e11d2e; margin-bottom: 2mm; }

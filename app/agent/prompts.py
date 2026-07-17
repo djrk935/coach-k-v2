@@ -34,6 +34,15 @@ TASK: Design a periodized program as a WorkoutPlan object.
 - Every prescription must trace to a principle in the SOURCES block; list each in
   `citations` with the chunk_id you drew it from.
 - Anchor intensities to the athlete's logged 1RMs when available.
+- Structure each day: mark `set_type` ('warmup' | 'straight' | 'superset' |
+  'finisher'). Pair time-efficient accessories as supersets by giving both
+  exercises the same `superset_group` letter ('A', 'B'…) — never superset
+  primary strength lifts.
+- Use standard exercise names ("Back Squat", "Dumbbell Shoulder Press") — they
+  map to form illustrations in the PDF.
+- Include `nutrition` daily targets (calories/protein/carbs/fat + brief guidance)
+  supporting the goal; anchor protein to bodyweight when known, and label
+  estimates as estimates.
 - `scientific_rationale`: explain the periodization choice, volume landmarks, and
   progression logic in the athlete's language — cite as you go.
 - Respect readiness: if fatigue markers are elevated, bake in the deload sooner."""

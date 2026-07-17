@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from pydantic import BaseModel
 
@@ -37,6 +38,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Self-hosted form illustrations (free-exercise-db) — start/end frames per lift.
+_MEDIA_IMAGES = Path(__file__).parent.parent / "exercise_media" / "images"
+if _MEDIA_IMAGES.exists():
+    app.mount("/api/exercise-images", StaticFiles(directory=_MEDIA_IMAGES), name="exercise-images")
 
 
 def _text(content) -> str:
@@ -116,6 +122,17 @@ async def program_pdf(program_id: str):
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{name}.pdf"'},
     )
+
+
+@app.get("/api/exercises/{name}/media")
+async def exercise_media(name: str):
+    """Form media for one exercise: two frame URLs (UI flips them = GIF feel)."""
+    from app.exercises.resolver import media_for
+
+    m = media_for(name)
+    if not m:
+        raise HTTPException(404, f"no form media matched for {name!r}")
+    return {k: m[k] for k in ("matched", "image_urls", "instructions", "primary_muscles")}
 
 
 @app.get("/api/dashboard")

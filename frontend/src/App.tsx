@@ -30,6 +30,67 @@ function acwrTone(acwr: number | null) {
   return { label: "in the zone", cls: "text-emerald-400" };
 }
 
+type FormMedia = { matched: string; image_urls: string[]; instructions: string[] };
+
+// Two start/end frames flipped on a timer — GIF feel, zero GIFs.
+function FormLookup() {
+  const [q, setQ] = useState("");
+  const [media, setMedia] = useState<FormMedia | null>(null);
+  const [err, setErr] = useState("");
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    if (!media) return;
+    const t = setInterval(() => setFrame((f) => 1 - f), 900);
+    return () => clearInterval(t);
+  }, [media]);
+
+  async function lookup() {
+    if (!q.trim()) return;
+    setErr("");
+    setMedia(null);
+    const r = await fetch(`/api/exercises/${encodeURIComponent(q.trim())}/media`);
+    if (r.ok) setMedia(await r.json());
+    else setErr("No form match — try a standard name like “Back Squat”.");
+  }
+
+  return (
+    <section className="rounded-xl bg-panel p-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
+        Form Check
+      </h3>
+      <div className="flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && lookup()}
+          placeholder="e.g. Romanian Deadlift"
+          className="w-full min-w-0 flex-1 rounded-lg border border-line bg-ink px-3 py-2 text-sm outline-none placeholder:text-mut focus:border-brand"
+        />
+        <button onClick={lookup} className="rounded-lg bg-brand px-3 text-sm font-semibold text-white">
+          Go
+        </button>
+      </div>
+      {err && <p className="mt-2 text-xs text-mut">{err}</p>}
+      {media && (
+        <div className="mt-3">
+          <img
+            src={media.image_urls[frame] ?? media.image_urls[0]}
+            alt={media.matched}
+            className="w-full rounded-lg border border-line bg-white"
+          />
+          <p className="mt-1.5 text-xs font-semibold">{media.matched}</p>
+          {media.instructions[0] && (
+            <p className="mt-1 text-xs leading-relaxed text-mut">
+              {media.instructions.slice(0, 2).join(" ")}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function App() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -196,6 +257,8 @@ export default function App() {
             </ul>
           </section>
         )}
+
+        <FormLookup />
 
         <section className="rounded-xl bg-panel p-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">

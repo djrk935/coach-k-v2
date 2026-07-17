@@ -18,6 +18,18 @@
     </div>
   </header>
 
+  <section class="overview">
+    <h2>Weekly Split</h2>
+    <table>
+      <thead><tr><th>Day</th><th>Focus</th></tr></thead>
+      <tbody>
+        {% for day in plan.weekly_split %}
+        <tr><td class="ex">{{ day.day_label }}</td><td>{{ day.focus }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
   {% for day in plan.weekly_split %}
   <section class="day">
     <h2>{{ day.day_label }}</h2>
@@ -32,7 +44,21 @@
       <tbody>
         {% for ex in day.exercises %}
         <tr>
-          <td class="ex">{{ ex.exercise }}</td>
+          <td class="ex">
+            <div class="exname">
+              {% if ex.superset_group %}<span class="ss">{{ ex.superset_group }}</span>{% endif %}
+              {{ ex.exercise }}
+            </div>
+            {% if ex.set_type and ex.set_type not in ("straight",) %}
+              <span class="badge badge-{{ ex.set_type }}">{{ ex.set_type }}</span>
+            {% endif %}
+            {% set m = media.get(ex.exercise) %}
+            {% if m %}
+            <div class="frames">
+              {% for p in m.image_paths %}<img src="file://{{ p }}" />{% endfor %}
+            </div>
+            {% endif %}
+          </td>
           <td>{{ ex.sets }}</td>
           <td>{{ ex.reps }}</td>
           <td>{{ ex.intensity }}</td>
@@ -43,6 +69,9 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if day.exercises | selectattr("superset_group") | list %}
+    <p class="legend">Shared letters = superset: perform back-to-back, rest after the pair.</p>
+    {% endif %}
   </section>
   {% endfor %}
 
@@ -52,6 +81,19 @@
     <h2>Deload Protocol</h2>
     <p>{{ plan.deload_protocol }}</p>
   </section>
+
+  {% if plan.nutrition %}
+  <section class="block nutrition">
+    <h2>Daily Nutrition Targets</h2>
+    <div class="macros">
+      <div><span>Calories</span>{{ plan.nutrition.calories }}</div>
+      <div><span>Protein</span>{{ plan.nutrition.protein_g }}g</div>
+      <div><span>Carbs</span>{{ plan.nutrition.carbs_g }}g</div>
+      <div><span>Fat</span>{{ plan.nutrition.fat_g }}g</div>
+    </div>
+    <p>{{ plan.nutrition.guidance }}</p>
+  </section>
+  {% endif %}
 
   <section class="block rationale">
     <h2>Why This Program</h2>
@@ -70,6 +112,10 @@
       {% endfor %}
     </ol>
   </section>
+  {% endif %}
+
+  {% if media_credits %}
+  <p class="microcredit">Exercise illustrations: free-exercise-db (open source).</p>
   {% endif %}
 
 </body>
