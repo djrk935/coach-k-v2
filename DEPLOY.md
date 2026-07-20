@@ -1,16 +1,24 @@
 # Deploying Coach K v2
 
-Two supported paths. Both use the Dockerfile (which bundles WeasyPrint's system
-libs, the local embedding model, exercise media, and the built frontend — none
-of which a default buildpack provides).
+Two supported paths. Both use the **Dockerfile** (WeasyPrint system libs, baked-in
+embedding model, exercise media, and the built React UI).
 
 **Always set `APP_PASSWORD`** — it gates the whole API. Without it, anyone who
-finds the URL can chat on your Anthropic credits.
+finds the URL can spend your Anthropic credits.
 
-## Option A — DigitalOcean Droplet with docker compose (recommended, simplest)
+**Migrations run automatically** when the app starts (`app/migrate.py`). You do
+not need to hand-run `migrations/*.sql` on new databases (Docker Compose, App
+Platform, or local `createdb`).
 
-1. Create a droplet from the **Docker on Ubuntu** marketplace image
-   (≥ 2 GB RAM — the embedding model + agent need it).
+On **DigitalOcean Managed Postgres**, enable the **pgvector** extension once:
+Databases → your cluster → Settings → Extensions → **vector** → Enable. The app
+also runs `CREATE EXTENSION IF NOT EXISTS vector` on startup when permitted.
+
+---
+
+## Option A — DigitalOcean Droplet + Docker Compose (simplest)
+
+1. Create a droplet from the **Docker on Ubuntu** marketplace image (≥ **2 GB RAM**).
 2. On the droplet:
 
 ```bash
@@ -18,17 +26,16 @@ git clone https://github.com/djrk935/coach-k-v2.git && cd coach-k-v2
 cat > .env <<'EOF'
 POSTGRES_PASSWORD=<random-strong-password>
 ANTHROPIC_API_KEY=sk-ant-...
-APP_PASSWORD=<the password you'll type in the browser>
+APP_PASSWORD=<password for browser + iOS Settings>
 EOF
-docker compose up -d --build     # first build ~5-10 min
+docker compose up -d --build    # first build ~5–10 min
 ```
 
-3. Open `http://<droplet-ip>` — enter `APP_PASSWORD` at the lock screen. Done.
+3. Open `http://<droplet-ip>` — enter `APP_PASSWORD` at the lock screen.
 
-Postgres runs the schema migration automatically on first boot
-(`migrations/001_init.sql` is mounted into initdb.d).
+For HTTPS, put **Caddy** or nginx in front of the droplet, or use Option B.
 
-### Bring your data (books, logs, programs) from your Mac
+### Move your library + logs from a Mac
 
 ```bash
 # on the Mac
@@ -41,27 +48,60 @@ docker compose exec -T db pg_restore -U coach -d coachk --clean --no-owner < coa
 docker compose restart app
 ```
 
-This carries the full 7k-chunk library — no re-parsing, no LlamaParse credits.
+---
 
-## Option B — DigitalOcean App Platform
+## Option B — DigitalOcean App Platform (HTTPS for iPhone)
 
-1. App Platform → Create App → your GitHub repo. It detects the **Dockerfile**
-   (do not let it use a Python buildpack).
-2. Instance: ≥ 1 GB RAM.
-3. Add a **managed Postgres** (v15+) and enable the `vector` extension
-   (Databases → your cluster → Settings → Extensions → pgvector), then run
-   `migrations/001_init.sql` against it once (`psql $DATABASE_URL -f ...`).
-4. App-level env vars:
-   - `DATABASE_URL` — the connection string **with `?sslmode=require`**
-   - `ANTHROPIC_API_KEY`, `APP_PASSWORD`
-5. The app listens on `$PORT` (App Platform sets it automatically).
+Best if you want a stable **https://…ondigitalocean.app** URL for Safari and the
+iOS app without managing TLS yourself.
+
+1. Push this repo to GitHub (already at `djrk935/coach-k-v2`).
+2. App Platform → **Create App** → GitHub → select **coach-k-v2**.
+3. Use **Dockerfile** deploy (do **not** use the Python buildpack).
+4. **Add a Dev Database** or managed Postgres cluster (PG 15+), link it as
+   `DATABASE_URL` (App Platform injects `${db.DATABASE_URL}` — include SSL).
+5. Enable **pgvector** on that cluster (see above).
+6. Set **secrets**:
+   - `ANTHROPIC_API_KEY`
+   - `APP_PASSWORD` (same value you type in iOS Settings → App password)
+7. Instance size: **≥ 2 GB RAM** (`apps-s-1vcpu-2gb` or larger).
+8. Health check path: **`/api/health`** (returns `{"ok":true,"db":true}` when ready).
+
+You can import the starter spec from [`.do/app.yaml`](.do/app.yaml) and adjust
+region / repo / database name.
+
+First deploy may take several minutes (image build + model bake). Watch **Runtime
+Logs** for `migrations applied: …`.
+
+---
+
+## iPhone (personal device)
+
+1. Install **Xcode**, then:
+
+```bash
+brew install xcodegen
+cd ios && xcodegen generate && open CoachK.xcodeproj
+```
+
+2. **Signing**: Xcode → CoachK target → **Signing & Capabilities** → your Apple ID
+   (Personal Team). Required for a real device; simulator can skip signing.
+3. **Settings in the app** (on device):
+   - **Server**: your App Platform URL, e.g. `https://coach-k-xxxxx.ondigitalocean.app`
+     (must be **HTTPS** on a physical iPhone — HTTP only works on simulator / local LAN).
+   - **App password**: same as `APP_PASSWORD` on the server.
+   - Tap **Test Connection** — should show password accepted.
+4. Same Wi‑Fi / cellular is fine; no VPN needed if the URL is public HTTPS.
+
+Simulator defaults to `http://localhost:8000` with `./run.sh` on your Mac.
+
+---
 
 ## Notes
 
-- `/api/health` is unauthenticated — use it as the health-check endpoint.
-- Exercise images are public by design (open-source content; `<img>` can't send
-  auth headers).
-- `LLAMA_CLOUD_API_KEY` is only needed if you ingest new books *from the server*;
-  you can also ingest locally and re-run the pg_dump/restore.
-- HTTPS: put the droplet behind a domain + Caddy/nginx, or let App Platform
-  terminate TLS for you (automatic).
+- `/api/health` is unauthenticated — use it for probes; it also checks DB connectivity.
+- Exercise images are public (open-source content; `<img>` tags cannot send auth headers).
+- `LLAMA_CLOUD_API_KEY` is only needed to ingest **new** PDFs on the server; ingest
+  locally and `pg_dump`/`restore` to avoid re-parsing.
+- **Web push** (optional): generate VAPID keys (`python -m app.gen_vapid_keys`) and set
+  `VAPID_*` env vars on the server.

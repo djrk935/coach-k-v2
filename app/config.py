@@ -1,10 +1,24 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def normalize_database_url(url: str) -> str:
+    """App Platform and Heroku often use postgres://; drivers expect postgresql://."""
+    u = url.strip()
+    if u.startswith("postgres://"):
+        return "postgresql://" + u[len("postgres://") :]
+    return u
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalize_database_url(cls, v: str) -> str:
+        return normalize_database_url(v)
     anthropic_api_key: str
     llama_cloud_api_key: str | None = None
     openai_api_key: str | None = None
@@ -14,7 +28,10 @@ class Settings(BaseSettings):
 
     # Deployment
     app_password: str | None = None  # set in prod: gates /api/* behind x-app-key
-    cors_origins: str = "http://localhost:5173"  # comma-separated
+    # Comma-separated. Production serves the UI from the same origin — localhost
+    # is only for Vite dev. Set CORS_ORIGINS=https://your-app.ondigitalocean.app
+    # if you split frontend and API.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Push notifications (web push / VAPID)
     vapid_public_key: str | None = None

@@ -21,8 +21,13 @@ struct SettingsView: View {
                     Button("Test Connection") {
                         Task {
                             do {
-                                let _: OkResult = try await API.get("/api/health")
-                                status = "✅ Connected"
+                                if appKey.isEmpty {
+                                    let _: OkResult = try await API.get("/api/health")
+                                    status = "✅ Server reachable (set app password if the API is locked)"
+                                } else {
+                                    let _: [ChatMeta] = try await API.get("/api/chats")
+                                    status = "✅ Connected — password accepted"
+                                }
                             } catch {
                                 status = "⚠ \(error.localizedDescription)"
                             }
@@ -31,6 +36,8 @@ struct SettingsView: View {
                     if !status.isEmpty {
                         Text(status).font(.caption).foregroundStyle(Color.mut)
                     }
+                } footer: {
+                    Text("Production: use your App Platform HTTPS URL (https://….ondigitalocean.app) and the same APP_PASSWORD you set on the server.")
                 }
 
                 Section {

@@ -17,6 +17,7 @@ from app.agent.graph import build_graph, parse_voice_set
 from app.artifacts.renderer import render_program_pdf
 from app.config import settings
 from app.db import close_pool
+from app.migrate import apply_migrations
 from app.ingestion.pipeline import ingest_pdf
 from app.notifications import notify
 from app.scheduler import start_scheduler
@@ -24,6 +25,12 @@ from app.scheduler import start_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+
+    applied = await asyncio.to_thread(apply_migrations, settings.database_url)
+    if applied:
+        print(f"migrations applied: {', '.join(applied)}")
+
     # Durable per-user chat memory: the Postgres saver survives restarts, so
     # Coach K resumes a conversation mid-thread instead of forgetting it.
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as saver:
@@ -64,7 +71,18 @@ async def auth_guard(request: Request, call_next):
 
 @app.get("/api/health")
 async def health():
-    return {"ok": True}
+    from app.db import get_pool
+
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+    except Exception as exc:
+        return JSONResponse(
+            {"ok": False, "db": False, "detail": str(exc)[:200]},
+            status_code=503,
+        )
+    return {"ok": True, "db": True}
 
 # Self-hosted form illustrations (free-exercise-db) — start/end frames per lift.
 _MEDIA_IMAGES = Path(__file__).parent.parent / "exercise_media" / "images"

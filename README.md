@@ -15,8 +15,8 @@ React 19 + Tailwind 4
 ```bash
 # Backend
 uv sync
-createdb coachk && psql coachk -f migrations/001_init.sql
-cp .env.example .env            # fill ANTHROPIC_API_KEY + LLAMA_CLOUD_API_KEY
+createdb coachk    # migrations run automatically on first ./run.sh
+cp .env.example .env            # fill ANTHROPIC_API_KEY + APP_PASSWORD for prod-like dev
 # macOS: WeasyPrint needs pango — brew install pango
 
 # Exercise form illustrations (free-exercise-db, ~100MB, one-time)
@@ -29,6 +29,11 @@ uv run python -m app.ingestion.pipeline ~/library/supertraining.pdf "Supertraini
 ./run.sh                                     # backend on :8000 (sets DYLD path for WeasyPrint)
 cd frontend && npm install && npm run dev    # http://localhost:5173
 ```
+
+## Deploy + iPhone
+
+See **[DEPLOY.md](DEPLOY.md)** for DigitalOcean (Docker Compose or App Platform with
+HTTPS) and installing the native iOS app on your phone.
 
 ## How it works
 

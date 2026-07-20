@@ -122,15 +122,21 @@ async def store_health_readiness(user_id: str, metrics: dict) -> dict:
         hb = baseline("hrv_ms")
         # HRV above baseline = recovered; 0.7x→0, 1.1x→1. Neutral w/o baseline.
         comp = max(0.0, min(1.0, (hrv / hb - 0.7) / 0.4)) if hb else 0.6
-        score += 0.6 * comp; weight += 0.6; parts["hrv"] = round(comp, 2)
+        score += 0.6 * comp
+        weight += 0.6
+        parts["hrv"] = round(comp, 2)
     if (sleep := metrics.get("sleep_h")) is not None:
         comp = max(0.0, min(1.0, (sleep - 4) / 4))  # 4h→0, 8h→1
-        score += 0.3 * comp; weight += 0.3; parts["sleep"] = round(comp, 2)
+        score += 0.3 * comp
+        weight += 0.3
+        parts["sleep"] = round(comp, 2)
     if (rhr := metrics.get("resting_hr")):
         rb = baseline("resting_hr")
         # Lower RHR is better; +15% over baseline → 0. Neutral w/o baseline.
         comp = max(0.0, min(1.0, 1 - (rhr - rb) / (0.15 * rb))) if rb else 0.6
-        score += 0.1 * comp; weight += 0.1; parts["rhr"] = round(comp, 2)
+        score += 0.1 * comp
+        weight += 0.1
+        parts["rhr"] = round(comp, 2)
 
     stored = {**metrics, "source": "healthkit"}
     baselined = bool(baseline("hrv_ms"))
