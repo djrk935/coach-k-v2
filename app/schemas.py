@@ -93,13 +93,13 @@ class ReadinessEntry(BaseModel):
     soreness_0_10: int | None = None
     stress_0_10: int | None = None
     motivation_0_10: int | None = None
-    bodyweight_kg: float | None = None
+    bodyweight_lbs: float | None = None
     notes: str | None = None
 
 
 class LoggedSet(BaseModel):
     exercise: str
-    weight_kg: float | None = None
+    weight_lbs: float | None = None
     reps: int | None = None
     rir: float | None = None
 

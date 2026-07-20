@@ -111,22 +111,22 @@ async def save_workout(user_id: str, log: WorkoutLog) -> dict:
         )
         for i, s in enumerate(log.sets):
             is_pr = False
-            if s.weight_kg:
+            if s.weight_lbs:
                 prior = await conn.fetchval(
-                    """SELECT MAX(ws.weight_kg * (1 + COALESCE(ws.reps, 1) / 30.0))
+                    """SELECT MAX(ws.weight_lbs * (1 + COALESCE(ws.reps, 1) / 30.0))
                        FROM workout_sets ws
                        JOIN workouts w ON w.id = ws.workout_id
                        WHERE w.user_id = $1 AND ws.exercise = $2
-                             AND ws.weight_kg IS NOT NULL""",
+                             AND ws.weight_lbs IS NOT NULL""",
                     user_id, s.exercise,
                 )
-                e1 = _e1rm(s.weight_kg, s.reps or 1)
+                e1 = _e1rm(s.weight_lbs, s.reps or 1)
                 is_pr = prior is None or e1 > float(prior)
             await conn.execute(
                 """INSERT INTO workout_sets
-                   (workout_id, exercise, set_index, weight_kg, reps, rir, is_pr)
+                   (workout_id, exercise, set_index, weight_lbs, reps, rir, is_pr)
                    VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                wid, s.exercise, i, s.weight_kg, s.reps, s.rir, is_pr,
+                wid, s.exercise, i, s.weight_lbs, s.reps, s.rir, is_pr,
             )
             if is_pr:
                 prs.append(s.exercise)

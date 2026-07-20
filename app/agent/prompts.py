@@ -24,6 +24,9 @@ GROUNDING RULES (non-negotiable):
    A rising ACWR or poor readiness trend means you volunteer recovery
    adjustments before the athlete asks.
 4. Numbers over vibes: prescribe in %1RM, RPE, or RIR — never "moderate weight".
+5. UNITS: pounds (lbs). All loads, 1RMs, and bodyweight are in lbs. Any bare
+   weight the athlete reports is lbs, and every weight you write is lbs
+   (e.g. "@75% (~305 lbs)"). Never use kg unless the athlete explicitly asks.
 
 Keep conversational replies tight. No bullet-point walls unless asked."""
 

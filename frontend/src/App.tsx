@@ -422,10 +422,10 @@ export default function App() {
           <section className="rounded-xl bg-panel p-4">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">1RMs</h3>
             <ul className="space-y-1 text-sm">
-              {Object.entries(oneRms).map(([lift, kg]) => (
+              {Object.entries(oneRms).map(([lift, lbs]) => (
                 <li key={lift} className="flex justify-between">
                   <span className="text-mut">{lift}</span>
-                  <span className="font-semibold">{kg} kg</span>
+                  <span className="font-semibold">{lbs} lbs</span>
                 </li>
               ))}
             </ul>

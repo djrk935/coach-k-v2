@@ -16,7 +16,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
     goals: String(profile.goals ?? ""),
     schedule: String(profile.schedule ?? ""),
     equipment: String(profile.equipment ?? ""),
-    bodyweight_kg: profile.bodyweight_kg ? String(profile.bodyweight_kg) : "",
+    bodyweight_lbs: profile.bodyweight_lbs ? String(profile.bodyweight_lbs) : "",
     ...Object.fromEntries(LIFTS.map((l) => [l, rms[l] ? String(rms[l]) : ""])),
   } as Record<string, string>);
   const [saving, setSaving] = useState(false);
@@ -30,7 +30,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
       goals: form.goals || undefined,
       schedule: form.schedule || undefined,
       equipment: form.equipment || undefined,
-      bodyweight_kg: form.bodyweight_kg ? Number(form.bodyweight_kg) : undefined,
+      bodyweight_lbs: form.bodyweight_lbs ? Number(form.bodyweight_lbs) : undefined,
       ...(Object.keys(lifts).length ? { lifts_1rm: lifts } : {}),
     };
     await api("/api/profile", {
@@ -67,12 +67,12 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
         </div>
         <div className="space-y-3">
           {field("name", "Name")}
-          {field("goals", "Goals", "e.g. 200kg squat; size secondary")}
+          {field("goals", "Goals", "e.g. 405 lb squat; size secondary")}
           {field("schedule", "Schedule", "e.g. 3 days/week")}
           {field("equipment", "Equipment", "e.g. full barbell setup at home")}
-          {field("bodyweight_kg", "Bodyweight (kg)", "e.g. 84")}
+          {field("bodyweight_lbs", "Bodyweight (lbs)", "e.g. 185")}
           <div>
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-mut">1RMs (kg)</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-mut">1RMs (lbs)</span>
             <div className="grid grid-cols-2 gap-2">
               {LIFTS.map((l) => (
                 <input
