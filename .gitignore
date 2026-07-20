@@ -10,3 +10,5 @@ dist/
 library/
 exercise_media/
 photos/
+ios/build/
+ios/CoachK.xcodeproj/

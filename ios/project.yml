@@ -1,0 +1,27 @@
+name: CoachK
+options:
+  bundleIdPrefix: com.dayan
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  CoachK:
+    type: application
+    platform: iOS
+    sources: [CoachK]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dayan.coachk
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+    info:
+      path: CoachK/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSSpeechRecognitionUsageDescription: Coach K transcribes your voice to log sets hands-free.
+        NSMicrophoneUsageDescription: Coach K listens so you can log sets by voice mid-workout.
