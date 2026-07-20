@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { api, appKey, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
+import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import Settings from "./Settings";
 import Templates from "./Templates";
+import Today from "./Today";
 
 // Minimal markdown: **bold** + [links](url); /api links get the auth key.
 function md(text: string) {
@@ -117,7 +118,7 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  const [view, setView] = useState<"chat" | "templates">("chat");
+  const [view, setView] = useState<"today" | "chat" | "templates">("today");
   const [showSettings, setShowSettings] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -280,14 +281,19 @@ export default function App() {
             + New
           </button>
           <div className="flex-1" />
-          <button
-            onClick={() => setView(view === "chat" ? "templates" : "chat")}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-              view === "templates" ? "bg-brand text-white" : "border border-line hover:border-brand"
-            }`}
-          >
-            Templates
-          </button>
+          <nav className="flex gap-1 rounded-lg border border-line p-0.5">
+            {(["today", "chat", "templates"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${
+                  view === v ? "bg-brand text-white" : "text-mut hover:text-white"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </nav>
           <button
             onClick={() => setShowSettings(true)}
             className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
@@ -297,7 +303,9 @@ export default function App() {
           </button>
         </header>
 
-        {view === "templates" ? (
+        {view === "today" ? (
+          <Today onGoToTemplates={() => setView("templates")} />
+        ) : view === "templates" ? (
           <Templates
             onPersonalize={(name) => {
               setView("chat");

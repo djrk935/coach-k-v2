@@ -4,7 +4,7 @@ import { api, Template, TemplateEx } from "./api";
 const GOALS = ["all", "strength", "hypertrophy", "athleticism", "general"] as const;
 
 // Start/end frames flipped on a timer — the "GIF" treatment.
-function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }) {
+export function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }) {
   const [f, setF] = useState(0);
   useEffect(() => {
     if (urls.length < 2) return;

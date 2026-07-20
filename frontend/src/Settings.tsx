@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "./api";
+import { api, enablePush } from "./api";
 
 type Props = {
   profile: Record<string, unknown>;
@@ -20,6 +20,23 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
     ...Object.fromEntries(LIFTS.map((l) => [l, rms[l] ? String(rms[l]) : ""])),
   } as Record<string, string>);
   const [saving, setSaving] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string>(
+    typeof Notification !== "undefined" && Notification.permission === "granted"
+      ? "Notifications are on."
+      : "",
+  );
+
+  async function handleEnablePush() {
+    const result = await enablePush();
+    setPushStatus(
+      {
+        enabled: "Notifications are on — you'll hear from Coach K.",
+        denied: "Permission denied — enable notifications for this site in browser settings.",
+        unsupported: "This browser doesn't support push notifications.",
+        unconfigured: "Push isn't configured on this server yet.",
+      }[result],
+    );
+  }
 
   async function save() {
     setSaving(true);
@@ -62,9 +79,29 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-black">Settings — Athlete Profile</h2>
+          <h2 className="text-lg font-black">Settings</h2>
           <button onClick={onClose} className="text-mut hover:text-white">✕</button>
         </div>
+
+        <section className="mb-5 rounded-xl border border-line p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-mut">
+            Notifications
+          </h3>
+          <p className="mb-2 text-xs text-mut">
+            Readiness check-ins, PR shouts, and recovery nudges — Coach K reaches out first.
+          </p>
+          <button
+            onClick={handleEnablePush}
+            className="w-full rounded-lg bg-brand py-2 text-sm font-semibold text-white"
+          >
+            Enable Notifications
+          </button>
+          {pushStatus && <p className="mt-2 text-xs text-mut">{pushStatus}</p>}
+        </section>
+
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
+          Athlete Profile
+        </h3>
         <div className="space-y-3">
           {field("name", "Name")}
           {field("goals", "Goals", "e.g. 405 lb squat; size secondary")}

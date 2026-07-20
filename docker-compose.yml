@@ -11,7 +11,9 @@ services:
       POSTGRES_DB: coachk
     volumes:
       - dbdata:/var/lib/postgresql/data
-      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      # Whole dir: initdb.d runs every .sql file in it alphabetically, so
+      # 001/002/003/004... all apply in order on a fresh volume.
+      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U coach -d coachk"]
       interval: 5s
@@ -27,9 +29,15 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set in .env}
       LLAMA_CLOUD_API_KEY: ${LLAMA_CLOUD_API_KEY:-}
       APP_PASSWORD: ${APP_PASSWORD:?set in .env}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:coach@coach-k.local}
+    volumes:
+      - photos:/srv/photos
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   dbdata:
+  photos:

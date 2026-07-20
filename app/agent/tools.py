@@ -296,6 +296,283 @@ async def apply_memory_delta(user_id: str, delta: MemoryDelta) -> dict[str, Any]
     return summary
 
 
+# ===== Today's Workout (living plan, one-tap logging) =====
+
+# Canonical lift -> profile.lifts_1rm key, for suggesting weights from %1RM.
+_LIFT_KEY_BY_PATTERN = [
+    ("squat", "squat"), ("bench", "bench"), ("deadlift", "deadlift"),
+    ("overhead press", "press"), ("press", "press"),
+]
+
+
+def _lift_key_for(exercise: str) -> str | None:
+    name = exercise.lower()
+    for pattern, key in _LIFT_KEY_BY_PATTERN:
+        if pattern in name:
+            return key
+    return None
+
+
+def _suggest_weight(exercise: str, intensity: str, one_rms: dict, last_weight: float | None) -> float | None:
+    """Best-effort target load: %1RM off the profile, else last time's weight."""
+    import re
+
+    key = _lift_key_for(exercise)
+    if key and key in one_rms:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*%", intensity or "")
+        if m:
+            return round(one_rms[key] * float(m.group(1)) / 100 / 5) * 5  # round to nearest 5 lbs
+    return last_weight
+
+
+async def get_last_weight(user_id: str, exercise: str) -> float | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            """SELECT ws.weight_lbs FROM workout_sets ws
+               JOIN workouts w ON w.id = ws.workout_id
+               WHERE w.user_id = $1 AND ws.exercise = $2 AND ws.weight_lbs IS NOT NULL
+               ORDER BY w.performed_at DESC, ws.set_index DESC LIMIT 1""",
+            user_id, exercise,
+        )
+
+
+async def get_active_program(user_id: str) -> dict | None:
+    """Most recent program that's actually executable (non-empty weekly_split) —
+    skips placeholder/acknowledgment rows the agent sometimes saves mid-conversation."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT id::text, plan FROM programs
+               WHERE user_id = $1 AND jsonb_array_length(plan -> 'weekly_split') > 0
+               ORDER BY created_at DESC LIMIT 1""",
+            user_id,
+        )
+    if not row:
+        return None
+    return {"id": row["id"], "plan": json.loads(row["plan"])}
+
+
+async def get_or_init_progress(user_id: str, program_id: str) -> dict:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO program_progress (user_id, program_id) VALUES ($1, $2)
+               ON CONFLICT (user_id, program_id) DO UPDATE SET user_id = EXCLUDED.user_id
+               RETURNING day_index, cycle_count""",
+            user_id, program_id,
+        )
+    return {"day_index": row["day_index"], "cycle_count": row["cycle_count"]}
+
+
+async def get_open_workout(user_id: str, program_id: str, day_index: int) -> dict | None:
+    """Today's in-progress session for this program day, if one was started."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT id::text FROM workouts
+               WHERE user_id = $1 AND program_id = $2 AND program_day_index = $3
+                     AND completed_at IS NULL AND performed_at::date = CURRENT_DATE
+               ORDER BY performed_at DESC LIMIT 1""",
+            user_id, program_id, day_index,
+        )
+        if not row:
+            return None
+        sets = await conn.fetch(
+            """SELECT exercise, set_index, weight_lbs, reps, rir, is_pr, slot_index
+               FROM workout_sets WHERE workout_id = $1 ORDER BY set_index""",
+            row["id"],
+        )
+    return {"workout_id": row["id"], "sets": [dict(s) for s in sets]}
+
+
+async def get_today(user_id: str) -> dict | None:
+    """Everything the Today view needs: the day's plan, suggested weights,
+    and any sets already logged this session."""
+    prog = await get_active_program(user_id)
+    if not prog:
+        return None
+    days = prog["plan"].get("weekly_split", [])
+    if not days:
+        return None
+    progress = await get_or_init_progress(user_id, prog["id"])
+    day = days[progress["day_index"] % len(days)]
+    one_rms = (await get_latest_profile(user_id)).get("lifts_1rm", {})
+
+    open_workout = await get_open_workout(user_id, prog["id"], progress["day_index"])
+    # Keyed by slot (position in day.exercises), NOT exercise name — a day can
+    # list the same lift twice (warmup + working sets) and those must track
+    # independently, or logging one silently completes both.
+    logged_by_slot: dict[int, list[dict]] = {}
+    for s in (open_workout or {}).get("sets", []):
+        if s["slot_index"] is not None:
+            logged_by_slot.setdefault(s["slot_index"], []).append(s)
+
+    from app.exercises.resolver import media_for
+
+    exercises = []
+    for i, ex in enumerate(day.get("exercises", [])):
+        last = await get_last_weight(user_id, ex["exercise"])
+        media = media_for(ex["exercise"])
+        exercises.append({
+            **ex,
+            "suggested_weight_lbs": _suggest_weight(ex["exercise"], ex.get("intensity", ""), one_rms, last),
+            "logged_sets": logged_by_slot.get(i, []),
+            "image_urls": media["image_urls"] if media else [],
+        })
+
+    return {
+        "program_id": prog["id"],
+        "program_name": prog["plan"].get("program_name"),
+        "day_index": progress["day_index"],
+        "cycle_count": progress["cycle_count"],
+        "day_label": day.get("day_label"),
+        "focus": day.get("focus"),
+        "exercises": exercises,
+        "workout_id": (open_workout or {}).get("workout_id"),
+    }
+
+
+async def log_today_set(
+    user_id: str, program_id: str, day_index: int, slot_index: int, exercise: str,
+    weight_lbs: float | None, reps: int | None, rir: float | None,
+) -> dict:
+    """One-tap incremental logging — creates today's draft workout on the
+    first set, appends subsequent sets, flags PRs immediately (for push).
+    `slot_index` is the exercise's position in that day's list — required so
+    a repeated lift (warmup Back Squat + working Back Squat) tracks as two
+    independent rows instead of one logged set completing both."""
+    pool = await get_pool()
+    async with pool.acquire() as conn, conn.transaction():
+        wid = await conn.fetchval(
+            """SELECT id FROM workouts WHERE user_id = $1 AND program_id = $2
+                     AND program_day_index = $3 AND completed_at IS NULL
+                     AND performed_at::date = CURRENT_DATE""",
+            user_id, program_id, day_index,
+        )
+        if not wid:
+            wid = await conn.fetchval(
+                """INSERT INTO workouts (user_id, program_id, program_day_index)
+                   VALUES ($1, $2, $3) RETURNING id""",
+                user_id, program_id, day_index,
+            )
+        set_index = await conn.fetchval(
+            "SELECT COUNT(*) FROM workout_sets WHERE workout_id = $1 AND slot_index = $2",
+            wid, slot_index,
+        )
+        is_pr = False
+        if weight_lbs:
+            # PR check is keyed by exercise NAME (not slot) — a PR is about the
+            # lift, regardless of which row of the day's plan logged it.
+            prior = await conn.fetchval(
+                """SELECT MAX(ws.weight_lbs * (1 + COALESCE(ws.reps, 1) / 30.0))
+                   FROM workout_sets ws JOIN workouts w ON w.id = ws.workout_id
+                   WHERE w.user_id = $1 AND ws.exercise = $2 AND ws.weight_lbs IS NOT NULL""",
+                user_id, exercise,
+            )
+            e1 = _e1rm(weight_lbs, reps or 1)
+            is_pr = prior is None or e1 > float(prior)
+        await conn.execute(
+            """INSERT INTO workout_sets (workout_id, exercise, set_index, weight_lbs, reps, rir, is_pr, slot_index)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+            wid, exercise, set_index, weight_lbs, reps, rir, is_pr, slot_index,
+        )
+    return {"workout_id": str(wid), "set_index": set_index, "is_pr": is_pr}
+
+
+async def resolve_open_slot(
+    user_id: str, program_id: str, day_index: int, exercise: str, weight_lbs: float | None = None,
+) -> int:
+    """For voice logging: Haiku matches an exercise NAME, but a day can list
+    it twice (warmup vs. working sets at very different loads). Disambiguate
+    by the spoken weight first — "320 for 6" clearly means the working slot,
+    not a 240 lb warmup — falling back to day order (warmup-before-working)
+    when no weight was given or it doesn't clearly favor one slot."""
+    prog = await get_active_program(user_id)
+    days = (prog or {}).get("plan", {}).get("weekly_split", [])
+    if not prog or not (0 <= day_index < len(days)):
+        return 0
+    day_exercises = days[day_index].get("exercises", [])
+    matches = [i for i, ex in enumerate(day_exercises) if ex["exercise"] == exercise]
+    if not matches:
+        return 0
+
+    open_workout = await get_open_workout(user_id, program_id, day_index)
+    counts: dict[int, int] = {}
+    for s in (open_workout or {}).get("sets", []):
+        if s["slot_index"] is not None:
+            counts[s["slot_index"]] = counts.get(s["slot_index"], 0) + 1
+
+    open_matches = [i for i in matches if counts.get(i, 0) < day_exercises[i].get("sets", 0)]
+    if not open_matches:
+        return matches[-1]
+    if len(open_matches) == 1 or weight_lbs is None:
+        return open_matches[0]
+
+    one_rms = (await get_latest_profile(user_id)).get("lifts_1rm", {})
+    by_distance = []
+    for i in open_matches:
+        ex = day_exercises[i]
+        last = await get_last_weight(user_id, exercise)
+        suggested = _suggest_weight(exercise, ex.get("intensity", ""), one_rms, last)
+        if suggested is not None:
+            by_distance.append((abs(suggested - weight_lbs), i))
+    if by_distance:
+        return min(by_distance)[1]
+    return open_matches[0]
+
+
+async def finish_today(user_id: str, program_id: str, day_index: int, session_rpe: float | None) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.execute(
+            """UPDATE workouts SET completed_at = now(), session_rpe = COALESCE($4, session_rpe)
+               WHERE user_id = $1 AND program_id = $2 AND program_day_index = $3
+                     AND completed_at IS NULL AND performed_at::date = CURRENT_DATE""",
+            user_id, program_id, day_index, session_rpe,
+        )
+        prog = await conn.fetchval(
+            "SELECT plan FROM programs WHERE id = $1", program_id
+        )
+        n_days = len(json.loads(prog).get("weekly_split", [])) or 1
+        next_index = (day_index + 1) % n_days
+        next_cycle_incr = 1 if next_index == 0 else 0
+        await conn.execute(
+            """UPDATE program_progress SET day_index = $3, cycle_count = cycle_count + $4,
+                      updated_at = now()
+               WHERE user_id = $1 AND program_id = $2""",
+            user_id, program_id, next_index, next_cycle_incr,
+        )
+
+
+# ===== Push subscriptions =====
+
+async def save_push_subscription(user_id: str, subscription: dict) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO push_subscriptions (user_id, endpoint, subscription)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (endpoint) DO UPDATE SET subscription = EXCLUDED.subscription""",
+            user_id, subscription["endpoint"], json.dumps(subscription),
+        )
+
+
+async def list_push_subscriptions(user_id: str) -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT subscription FROM push_subscriptions WHERE user_id = $1", user_id
+        )
+    return [json.loads(r["subscription"]) for r in rows]
+
+
+async def remove_push_subscription(endpoint: str) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM push_subscriptions WHERE endpoint = $1", endpoint)
+
+
 # ===== Context assembly =====
 
 def format_context(

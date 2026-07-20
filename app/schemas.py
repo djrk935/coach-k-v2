@@ -86,6 +86,19 @@ class PhysiqueAssessment(BaseModel):
     )
 
 
+# ===== Voice/quick logging (Today view) =====
+
+class VoiceSetLog(BaseModel):
+    """Parsed from a spoken/typed one-liner like 'bench 225 for 5 at RPE 8'."""
+
+    exercise: str | None = Field(
+        None, description="Verbatim match from the provided exercise list, or null if unclear"
+    )
+    weight_lbs: float | None = None
+    reps: int | None = None
+    rir: float | None = None
+
+
 # ===== Evolving memory (extracted from conversation) =====
 
 class ReadinessEntry(BaseModel):

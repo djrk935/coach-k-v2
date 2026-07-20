@@ -13,11 +13,13 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from pydantic import BaseModel
 
 from app.agent import tools
-from app.agent.graph import build_graph
+from app.agent.graph import build_graph, parse_voice_set
 from app.artifacts.renderer import render_program_pdf
 from app.config import settings
 from app.db import close_pool
 from app.ingestion.pipeline import ingest_pdf
+from app.notifications import notify
+from app.scheduler import start_scheduler
 
 
 @asynccontextmanager
@@ -27,7 +29,9 @@ async def lifespan(app: FastAPI):
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as saver:
         await saver.setup()  # idempotent: creates checkpoint tables if absent
         app.state.agent = build_graph(saver)
+        scheduler = start_scheduler()
         yield
+        scheduler.shutdown(wait=False)
     await close_pool()
 
 
@@ -161,6 +165,104 @@ async def chat_messages(chat_id: str, request: Request):
         if text:
             out.append({"role": "user" if role == "human" else "assistant", "text": text})
     return out
+
+
+# ===== Today's Workout (living plan, one-tap + voice logging) =====
+
+@app.get("/api/today")
+async def today():
+    user_id = await tools.get_or_create_user()
+    day = await tools.get_today(user_id)
+    if not day:
+        return {"active": False}
+    return {"active": True, **day}
+
+
+class LogSetIn(BaseModel):
+    program_id: str
+    day_index: int
+    slot_index: int
+    exercise: str
+    weight_lbs: float | None = None
+    reps: int | None = None
+    rir: float | None = None
+
+
+@app.post("/api/today/log-set")
+async def today_log_set(body: LogSetIn):
+    user_id = await tools.get_or_create_user()
+    result = await tools.log_today_set(
+        user_id, body.program_id, body.day_index, body.slot_index, body.exercise,
+        body.weight_lbs, body.reps, body.rir,
+    )
+    if result["is_pr"]:
+        await notify(
+            user_id, "🎉 New PR!",
+            f"{body.exercise}: {body.weight_lbs}×{body.reps} — best yet.",
+        )
+    return result
+
+
+class VoiceLogIn(BaseModel):
+    text: str
+    program_id: str
+    day_index: int
+    exercise_names: list[str]
+
+
+@app.post("/api/today/log-voice")
+async def today_log_voice(body: VoiceLogIn):
+    user_id = await tools.get_or_create_user()
+    try:
+        parsed = await parse_voice_set(body.text, body.exercise_names)
+    except Exception as e:
+        raise HTTPException(503, f"couldn't parse that right now: {str(e)[:150]}") from e
+    if not parsed.exercise:
+        return {"matched": False, "heard": body.text}
+    slot = await tools.resolve_open_slot(
+        user_id, body.program_id, body.day_index, parsed.exercise, parsed.weight_lbs
+    )
+    result = await tools.log_today_set(
+        user_id, body.program_id, body.day_index, slot, parsed.exercise,
+        parsed.weight_lbs, parsed.reps, parsed.rir,
+    )
+    if result["is_pr"]:
+        await notify(
+            user_id, "🎉 New PR!",
+            f"{parsed.exercise}: {parsed.weight_lbs}×{parsed.reps} — best yet.",
+        )
+    return {"matched": True, "parsed": parsed.model_dump(), **result}
+
+
+class FinishTodayIn(BaseModel):
+    program_id: str
+    day_index: int
+    session_rpe: float | None = None
+
+
+@app.post("/api/today/finish")
+async def today_finish(body: FinishTodayIn):
+    user_id = await tools.get_or_create_user()
+    await tools.finish_today(user_id, body.program_id, body.day_index, body.session_rpe)
+    return {"ok": True}
+
+
+# ===== Push notifications =====
+
+@app.get("/api/push/vapid-public-key")
+async def vapid_public_key():
+    return {"key": settings.vapid_public_key}
+
+
+class PushSubscribeIn(BaseModel):
+    subscription: dict
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(body: PushSubscribeIn):
+    user_id = await tools.get_or_create_user()
+    await tools.save_push_subscription(user_id, body.subscription)
+    return {"ok": True}
 
 
 # ===== Profile (settings page) =====

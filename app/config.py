@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     # Deployment
     app_password: str | None = None  # set in prod: gates /api/* behind x-app-key
     cors_origins: str = "http://localhost:5173"  # comma-separated
+
+    # Push notifications (web push / VAPID)
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str = "mailto:coach@coach-k.local"
     embed_model: str = "BAAI/bge-base-en-v1.5"  # local via fastembed — free, private
     embed_dim: int = 768
 

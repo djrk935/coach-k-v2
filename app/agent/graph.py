@@ -14,7 +14,7 @@ from app.agent import prompts, tools
 from app.agent.state import AgentState
 from app.config import settings
 from app.retrieval.search import format_hits_for_prompt, hybrid_search
-from app.schemas import MemoryDelta, PhysiqueAssessment, WorkoutPlan
+from app.schemas import MemoryDelta, PhysiqueAssessment, VoiceSetLog, WorkoutPlan
 
 PHOTOS_DIR = Path(__file__).parent.parent.parent / "photos"
 
@@ -26,6 +26,24 @@ _fast = ChatAnthropic(
 )
 
 _INTENTS = {"program_request", "log", "coaching_qa", "checkin"}
+
+
+async def parse_voice_set(text: str, exercise_names: list[str]) -> VoiceSetLog:
+    """One-liner ('bench 225 for 5 at RPE 8') -> structured set. Used by the
+    Today view's tap-or-speak logging — no full agent turn, just extraction."""
+    structured = _fast.with_structured_output(VoiceSetLog)
+    return await structured.ainvoke([
+        {
+            "role": "system",
+            "content": (
+                "Extract a single logged set from this gym shorthand. "
+                f"Match `exercise` verbatim to one of: {exercise_names}. "
+                "If it doesn't clearly match any, leave exercise null. "
+                "Weight is in pounds. Extract only what's stated — no guessing."
+            ),
+        },
+        {"role": "user", "content": text},
+    ])
 
 
 def _text(content) -> str:
