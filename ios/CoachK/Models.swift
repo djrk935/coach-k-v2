@@ -72,6 +72,21 @@ struct FinishBody: Codable {
     let sessionRpe: Double?
 }
 
+struct ReadinessBody: Codable {
+    let sleepH: Double?
+    let hrvMs: Double?
+    let restingHr: Int?
+}
+
+struct ReadinessToday: Codable {
+    let readinessScore: Int?
+    let readinessStatus: String?
+    let sleepH: Double?
+    let hrvMs: Double?
+    let restingHr: Int?
+    let source: String?
+}
+
 struct ChatMeta: Codable, Identifiable {
     let id: String
     let title: String

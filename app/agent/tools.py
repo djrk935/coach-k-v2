@@ -94,6 +94,53 @@ async def upsert_readiness(user_id: str, entry: dict, for_date: date | None = No
         )
 
 
+def _readiness_status(score: int) -> str:
+    if score >= 80:
+        return "primed"
+    if score >= 65:
+        return "ready"
+    if score >= 50:
+        return "moderate"
+    return "compromised"
+
+
+async def store_health_readiness(user_id: str, metrics: dict) -> dict:
+    """Store objective HealthKit metrics (sleep_h, hrv_ms, resting_hr) for today
+    and derive a 0-100 readiness score against the athlete's OWN trailing
+    baseline. Like ACWR, the score stays neutral until there's enough history
+    (>=3 prior days of a signal) — a single reading has nothing to compare to."""
+    metrics = {k: v for k, v in metrics.items() if v is not None}
+    today = str(date.today())
+    prior = [r for r in await get_recent_readiness(user_id, days=30) if r.get("date") != today]
+
+    def baseline(key: str) -> float | None:
+        vals = [r[key] for r in prior if isinstance(r.get(key), (int, float))]
+        return sum(vals) / len(vals) if len(vals) >= 3 else None
+
+    score, weight, parts = 0.0, 0.0, {}
+    if (hrv := metrics.get("hrv_ms")):
+        hb = baseline("hrv_ms")
+        # HRV above baseline = recovered; 0.7x→0, 1.1x→1. Neutral w/o baseline.
+        comp = max(0.0, min(1.0, (hrv / hb - 0.7) / 0.4)) if hb else 0.6
+        score += 0.6 * comp; weight += 0.6; parts["hrv"] = round(comp, 2)
+    if (sleep := metrics.get("sleep_h")) is not None:
+        comp = max(0.0, min(1.0, (sleep - 4) / 4))  # 4h→0, 8h→1
+        score += 0.3 * comp; weight += 0.3; parts["sleep"] = round(comp, 2)
+    if (rhr := metrics.get("resting_hr")):
+        rb = baseline("resting_hr")
+        # Lower RHR is better; +15% over baseline → 0. Neutral w/o baseline.
+        comp = max(0.0, min(1.0, 1 - (rhr - rb) / (0.15 * rb))) if rb else 0.6
+        score += 0.1 * comp; weight += 0.1; parts["rhr"] = round(comp, 2)
+
+    stored = {**metrics, "source": "healthkit"}
+    baselined = bool(baseline("hrv_ms"))
+    if weight:
+        stored["readiness_score"] = round(100 * score / weight)
+        stored["readiness_status"] = _readiness_status(stored["readiness_score"])
+    await upsert_readiness(user_id, stored)
+    return {**stored, "baselined": baselined, "components": parts}
+
+
 # ===== Training log + PR detection (Epley e1RM) =====
 
 def _e1rm(weight: float, reps: int) -> float:

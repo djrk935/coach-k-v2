@@ -15,6 +15,10 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+    entitlements:
+      path: CoachK/CoachK.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     info:
       path: CoachK/Info.plist
       properties:
@@ -25,3 +29,4 @@ targets:
           NSAllowsLocalNetworking: true
         NSSpeechRecognitionUsageDescription: Coach K transcribes your voice to log sets hands-free.
         NSMicrophoneUsageDescription: Coach K listens so you can log sets by voice mid-workout.
+        NSHealthShareUsageDescription: Coach K reads your sleep, HRV, and resting heart rate to gauge recovery and adjust your training.

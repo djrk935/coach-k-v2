@@ -23,6 +23,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Coach K reads your sleep, HRV, and resting heart rate to gauge recovery and adjust your training.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Coach K listens so you can log sets by voice mid-workout.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -4,7 +4,9 @@ import SwiftUI
 @Observable
 final class TodayModel {
     var plan: TodayPlan?
+    var readiness: ReadinessToday?
     var loading = true
+    var syncing = false
     var error: String?
     var finished = false
     var lastHeard = ""
@@ -17,7 +19,30 @@ final class TodayModel {
         } catch {
             self.error = error.localizedDescription
         }
+        readiness = try? await API.get("/api/readiness/today") as ReadinessToday
         loading = false
+
+        // Auto-sync once per day if the athlete has connected Apple Health.
+        let connected = UserDefaults.standard.bool(forKey: "healthConnected")
+        let lastSync = UserDefaults.standard.string(forKey: "lastHealthSync")
+        if connected, lastSync != Self.todayKey {
+            await syncHealth()
+        }
+    }
+
+    static var todayKey: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    func syncHealth() async {
+        guard !syncing else { return }
+        syncing = true
+        if let result = await HealthKitManager.shared.sync() {
+            readiness = result
+            UserDefaults.standard.set(Self.todayKey, forKey: "lastHealthSync")
+        }
+        syncing = false
     }
 
     func logSet(slot: Int, exercise: String, weight: Double?, reps: Int?) async -> Bool {
@@ -110,6 +135,11 @@ struct TodayView: View {
         } else if let plan = model.plan, plan.active, let exercises = plan.exercises {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if let r = model.readiness, r.readinessScore != nil || r.hrvMs != nil {
+                        ReadinessBanner(readiness: r, syncing: model.syncing) {
+                            Task { await model.syncHealth() }
+                        }
+                    }
                     if let focus = plan.focus {
                         Text(focus).font(.subheadline).foregroundStyle(Color.mut)
                     }
@@ -182,6 +212,68 @@ struct TodayView: View {
                 .foregroundStyle(Color.brand)
         }
         .padding()
+    }
+}
+
+struct ReadinessBanner: View {
+    let readiness: ReadinessToday
+    let syncing: Bool
+    let onSync: () -> Void
+
+    private var statusColor: Color {
+        switch readiness.readinessStatus {
+        case "primed": return .green
+        case "ready": return Color(red: 0.4, green: 0.8, blue: 0.4)
+        case "moderate": return .yellow
+        case "compromised": return .brand
+        default: return .mut
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Readiness").font(.caption.bold())
+                    .foregroundStyle(Color.mut).textCase(.uppercase)
+                Spacer()
+                Button(action: onSync) {
+                    if syncing {
+                        ProgressView().controlSize(.mini).tint(.mut)
+                    } else {
+                        Image(systemName: "arrow.clockwise").font(.caption).foregroundStyle(Color.mut)
+                    }
+                }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let score = readiness.readinessScore {
+                    Text("\(score)").font(.system(size: 34, weight: .black)).foregroundStyle(.white)
+                    Text(readiness.readinessStatus ?? "").font(.subheadline.bold())
+                        .foregroundStyle(statusColor)
+                } else {
+                    Text("Synced").font(.headline).foregroundStyle(.white)
+                }
+            }
+            HStack(spacing: 16) {
+                metric("Sleep", readiness.sleepH.map { String(format: "%.1fh", $0) })
+                metric("HRV", readiness.hrvMs.map { "\(Int($0)) ms" })
+                metric("Rest HR", readiness.restingHr.map { "\($0) bpm" })
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.panel, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(statusColor).frame(width: 4).padding(.vertical, 10)
+        }
+    }
+
+    @ViewBuilder private func metric(_ label: String, _ value: String?) -> some View {
+        if let value {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label).font(.caption2).foregroundStyle(Color.mut)
+                Text(value).font(.footnote.bold()).foregroundStyle(.white)
+            }
+        }
     }
 }
 

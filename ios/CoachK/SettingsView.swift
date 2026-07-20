@@ -5,7 +5,9 @@ struct SettingsView: View {
     @AppStorage("baseURL") private var baseURL = "http://localhost:8000"
     @AppStorage("appKey") private var appKey = ""
     @AppStorage("dailyReminder") private var dailyReminder = false
+    @AppStorage("healthConnected") private var healthConnected = false
     @State private var status = ""
+    @State private var healthStatus = ""
 
     var body: some View {
         NavigationStack {
@@ -29,6 +31,30 @@ struct SettingsView: View {
                     if !status.isEmpty {
                         Text(status).font(.caption).foregroundStyle(Color.mut)
                     }
+                }
+
+                Section {
+                    Button(healthConnected ? "Re-sync Apple Health" : "Connect Apple Health") {
+                        Task {
+                            let ok = await HealthKitManager.shared.requestAuthorization()
+                            healthConnected = ok
+                            if ok {
+                                let result = await HealthKitManager.shared.sync()
+                                healthStatus = result == nil
+                                    ? "Connected — no recovery data yet (needs an Apple Watch night)."
+                                    : "Synced. Readiness score updated on Today."
+                            } else {
+                                healthStatus = "Health access denied — enable it in Settings › Health."
+                            }
+                        }
+                    }
+                    if !healthStatus.isEmpty {
+                        Text(healthStatus).font(.caption).foregroundStyle(Color.mut)
+                    }
+                } header: {
+                    Text("Apple Health")
+                } footer: {
+                    Text("Coach K reads last night's sleep, HRV, and resting heart rate to score your recovery and adjust training.")
                 }
 
                 Section {

@@ -247,6 +247,30 @@ async def today_finish(body: FinishTodayIn):
     return {"ok": True}
 
 
+# ===== Readiness (HealthKit sync) =====
+
+class ReadinessIn(BaseModel):
+    sleep_h: float | None = None
+    hrv_ms: float | None = None
+    resting_hr: int | None = None
+
+
+@app.post("/api/readiness")
+async def post_readiness(body: ReadinessIn):
+    user_id = await tools.get_or_create_user()
+    metrics = body.model_dump(exclude_none=True)
+    if not metrics:
+        raise HTTPException(400, "no readiness metrics provided")
+    return await tools.store_health_readiness(user_id, metrics)
+
+
+@app.get("/api/readiness/today")
+async def readiness_today():
+    user_id = await tools.get_or_create_user()
+    recent = await tools.get_recent_readiness(user_id, days=1)
+    return recent[0] if recent else {}
+
+
 # ===== Push notifications =====
 
 @app.get("/api/push/vapid-public-key")
