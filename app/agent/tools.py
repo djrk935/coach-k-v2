@@ -525,7 +525,7 @@ async def get_recent_pain_regions(user_id: str, days: int = 7) -> list[str]:
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT DISTINCT region FROM pain_logs
-               WHERE user_id = $1 AND logged_at > now() - ($2::text || ' days')::interval
+               WHERE user_id = $1 AND logged_at > now() - ($2::int * INTERVAL '1 day')
                ORDER BY region""",
             user_id, days,
         )
@@ -564,7 +564,7 @@ async def recent_prs(user_id: str, days: int = 14) -> list[str]:
             """SELECT DISTINCT ws.exercise FROM workout_sets ws
                JOIN workouts w ON w.id = ws.workout_id
                WHERE w.user_id = $1 AND ws.is_pr
-                     AND w.performed_at > now() - ($2::text || ' days')::interval""",
+                     AND w.performed_at > now() - ($2::int * INTERVAL '1 day')""",
             user_id, days,
         )
     return [r["exercise"] for r in rows]
@@ -1052,7 +1052,7 @@ async def get_progress(user_id: str, days: int = 90) -> dict:
                FROM workout_sets ws
                JOIN workouts w ON w.id = ws.workout_id
                WHERE w.user_id = $1
-                     AND w.performed_at > now() - ($2::text || ' days')::interval
+                     AND w.performed_at > now() - ($2::int * INTERVAL '1 day')
                      AND ws.weight_lbs IS NOT NULL
                ORDER BY day ASC""",
             user_id, days,
@@ -1070,7 +1070,7 @@ async def get_progress(user_id: str, days: int = 90) -> dict:
                FROM workouts w
                LEFT JOIN workout_sets ws ON ws.workout_id = w.id
                WHERE w.user_id = $1
-                     AND w.performed_at > now() - ($2::text || ' days')::interval
+                     AND w.performed_at > now() - ($2::int * INTERVAL '1 day')
                GROUP BY w.id, day
                ORDER BY day ASC""",
             user_id, days,
@@ -1080,7 +1080,7 @@ async def get_progress(user_id: str, days: int = 90) -> dict:
                FROM workout_sets ws
                JOIN workouts w ON w.id = ws.workout_id
                WHERE w.user_id = $1 AND ws.is_pr
-                     AND w.performed_at > now() - ($2::text || ' days')::interval
+                     AND w.performed_at > now() - ($2::int * INTERVAL '1 day')
                ORDER BY w.performed_at DESC
                LIMIT 12""",
             user_id, days,
