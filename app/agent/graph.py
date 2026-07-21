@@ -28,6 +28,19 @@ _fast = ChatAnthropic(
 _INTENTS = {"program_request", "log", "coaching_qa", "checkin"}
 
 
+def _sys(text: str, cache: bool = False) -> dict:
+    """A system message. When cache=True, mark it as an Anthropic prompt-cache
+    breakpoint so repeat turns within the TTL re-read this prefix at ~10% cost
+    instead of re-billing (and re-computing) the full tokens. We cache the two
+    stable-within-a-session prefixes — the coach's system prompt and the
+    athlete/context block — which is where nearly all the repeated tokens live."""
+    if cache:
+        return {"role": "system", "content": [
+            {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
+        ]}
+    return {"role": "system", "content": text}
+
+
 async def parse_voice_set(text: str, exercise_names: list[str]) -> VoiceSetLog:
     """One-liner ('bench 225 for 5 at RPE 8') -> structured set. Used by the
     Today view's tap-or-speak logging — no full agent turn, just extraction."""
@@ -99,8 +112,8 @@ async def act(state: AgentState) -> dict:
         structured = _llm.with_structured_output(WorkoutPlan)
         plan: WorkoutPlan = await structured.ainvoke(
             [
-                {"role": "system", "content": prompts.PROGRAM_SYSTEM},
-                {"role": "system", "content": ctx},
+                _sys(prompts.PROGRAM_SYSTEM, cache=True),
+                _sys(ctx, cache=True),
                 *state["messages"],
             ]
         )
@@ -135,8 +148,8 @@ async def act(state: AgentState) -> dict:
         # 2. Assess with vision + prior history for a real progress comparison.
         history = await tools.get_physique_history(state["user_id"])
         msgs = [
-            {"role": "system", "content": prompts.PHYSIQUE_SYSTEM},
-            {"role": "system", "content": ctx},
+            _sys(prompts.PHYSIQUE_SYSTEM, cache=True),
+            _sys(ctx, cache=True),
         ]
         if history:
             msgs.append({
@@ -180,8 +193,8 @@ async def act(state: AgentState) -> dict:
         summary = await tools.apply_memory_delta(state["user_id"], delta)
         res = await _llm.ainvoke(
             [
-                {"role": "system", "content": prompts.COACH_SYSTEM},
-                {"role": "system", "content": ctx},
+                _sys(prompts.COACH_SYSTEM, cache=True),
+                _sys(ctx, cache=True),
                 *state["messages"],
                 {
                     "role": "user",
@@ -195,8 +208,8 @@ async def act(state: AgentState) -> dict:
     # coaching_qa / checkin — grounded conversational reply (streams)
     res = await _llm.ainvoke(
         [
-            {"role": "system", "content": prompts.COACH_SYSTEM},
-            {"role": "system", "content": ctx},
+            _sys(prompts.COACH_SYSTEM, cache=True),
+            _sys(ctx, cache=True),
             *state["messages"],
         ]
     )
