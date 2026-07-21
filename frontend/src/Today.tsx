@@ -51,25 +51,25 @@ function ExerciseCard({
   }
 
   return (
-    <div className="rounded-xl border border-line bg-panel p-4">
+    <div className="rounded-xl border border-line bg-panel p-3 sm:p-4">
       <div className="flex items-start gap-3">
         <FlipImage urls={ex.image_urls} size={44} />
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
             {ex.superset_group && (
-              <span className="rounded bg-brand px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+              <span className="shrink-0 rounded bg-brand px-1.5 py-0.5 text-[10px] font-extrabold text-white">
                 {ex.superset_group}
               </span>
             )}
-            <p className="font-bold">{ex.exercise}</p>
-            {lastPr && <span className="text-xs">🎉 PR</span>}
+            <p className="truncate font-bold">{ex.exercise}</p>
+            {lastPr && <span className="shrink-0 text-xs">🎉 PR</span>}
           </div>
           <p className="text-xs text-mut">
             {target} × {ex.reps} · {ex.intensity}
             {ex.notes ? ` · ${ex.notes}` : ""}
           </p>
         </div>
-        <div className="text-right text-xs font-semibold text-mut">
+        <div className="shrink-0 text-right text-xs font-semibold text-mut">
           {done}/{target} sets
         </div>
       </div>
@@ -89,26 +89,26 @@ function ExerciseCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex min-w-0 items-center gap-2">
         <input
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           inputMode="decimal"
           placeholder="lbs"
-          className="w-20 rounded-lg border border-line bg-ink px-2 py-2.5 text-center text-sm outline-none focus:border-brand"
+          className="w-16 shrink-0 rounded-lg border border-line bg-ink px-1.5 py-2.5 text-center text-sm outline-none focus:border-brand sm:w-20 sm:px-2"
         />
-        <span className="text-mut">×</span>
+        <span className="shrink-0 text-mut">×</span>
         <input
           value={reps}
           onChange={(e) => setReps(e.target.value)}
           inputMode="numeric"
           placeholder="reps"
-          className="w-16 rounded-lg border border-line bg-ink px-2 py-2.5 text-center text-sm outline-none focus:border-brand"
+          className="w-14 shrink-0 rounded-lg border border-line bg-ink px-1.5 py-2.5 text-center text-sm outline-none focus:border-brand sm:w-16 sm:px-2"
         />
         <button
           onClick={logSet}
           disabled={busy || done >= target}
-          className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+          className="min-w-0 flex-1 rounded-lg bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
         >
           {done >= target ? "✓ Done" : "Log Set"}
         </button>
@@ -230,9 +230,9 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const allDone = plan.exercises.every((ex) => ex.logged_sets.length >= ex.sets);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
+    <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-black">{plan.day_label}</h2>
           <p className="text-sm text-mut">{plan.focus}</p>
         </div>

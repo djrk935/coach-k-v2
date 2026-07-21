@@ -73,9 +73,12 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/90 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/90 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-panel p-6"
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-panel p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:rounded-2xl sm:p-6 sm:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

@@ -8,7 +8,11 @@
   --color-mut: #8a8a92;
 }
 
-html, body, #root { height: 100%; }
+html, body, #root {
+  height: 100%;
+  /* dvh tracks the visible viewport on mobile Safari (address bar show/hide). */
+  height: 100dvh;
+}
 html { -webkit-text-size-adjust: 100%; }
 body {
   background: var(--color-ink);
