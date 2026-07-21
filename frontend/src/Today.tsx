@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, LoggedSet, TodayExercise, TodayPlan } from "./api";
+import { api, InjuryProtocol, LoggedSet, TodayExercise, TodayPlan } from "./api";
 import RestTimer from "./RestTimer";
 import { FlipImage } from "./Templates";
 
@@ -203,6 +203,127 @@ function ExerciseCard({
   );
 }
 
+function InjuryProtocolCard({
+  protocol,
+  busy,
+  onApply,
+}: {
+  protocol: InjuryProtocol;
+  busy: boolean;
+  onApply: (regionKey: string) => void;
+}) {
+  return (
+    <div className="ck-surface mb-3 border border-amber-500/35 bg-amber-500/10 p-4">
+      <p className="ck-eyebrow">Injury protocol</p>
+      <p className="mt-1 font-display text-lg font-black tracking-tight">{protocol.region}</p>
+      {protocol.volume_hint && (
+        <p className="mt-1 text-xs text-mut">{protocol.volume_hint}</p>
+      )}
+      <ul className="mt-3 space-y-1.5 text-xs leading-snug text-fg-dim">
+        {protocol.steps.map((step) => (
+          <li key={step} className="flex gap-2">
+            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+            <span>{step}</span>
+          </li>
+        ))}
+      </ul>
+      {protocol.alternatives.length > 0 && (
+        <>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-mut">
+            Prefer today
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {protocol.alternatives.map((alt) => (
+              <span
+                key={alt}
+                className="rounded-lg border border-line/80 bg-ink/40 px-2 py-1 text-[11px] font-medium"
+              >
+                {alt}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onApply(protocol.region_key)}
+        className="ck-btn ck-btn-ghost mt-3 w-full py-2.5 text-xs"
+      >
+        Apply suggested swaps
+      </button>
+    </div>
+  );
+}
+
+function PainReport({
+  options,
+  onLogged,
+}: {
+  options: { key: string; label: string }[];
+  onLogged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function logRegion(key: string) {
+    setBusy(true);
+    await api("/api/today/pain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ region: key, severity: 5 }),
+    });
+    setBusy(false);
+    setOpen(false);
+    onLogged();
+  }
+
+  if (!options.length) return null;
+
+  return (
+    <div className="mb-4">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-[11px] font-semibold text-mut underline-offset-2 hover:text-white hover:underline"
+        >
+          Something hurts? Flag a region
+        </button>
+      ) : (
+        <div className="ck-surface border border-line p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Where&apos;s the pain?</p>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-[11px] text-mut hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {options.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                disabled={busy}
+                onClick={() => logRegion(o.key)}
+                className="rounded-lg border border-line bg-ink/50 px-2.5 py-1.5 text-[11px] font-semibold hover:border-brand disabled:opacity-40"
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-mut">
+            Sharp joint pain = stop. This opens a protocol card and suggests swaps.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CheckinGate({
   onDone,
 }: {
@@ -270,6 +391,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
   const [restFor, setRestFor] = useState<number | null>(null);
+  const [protocolBusy, setProtocolBusy] = useState(false);
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
 
   const load = () =>
@@ -328,6 +450,22 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ program_id: plan.program_id, action }),
     });
+    await load();
+  }
+
+  async function applyProtocol(regionKey: string) {
+    if (!plan) return;
+    setProtocolBusy(true);
+    await api("/api/today/apply-protocol-swaps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        program_id: plan.program_id,
+        day_index: plan.day_index,
+        region_key: regionKey,
+      }),
+    });
+    setProtocolBusy(false);
     await load();
   }
 
@@ -503,6 +641,24 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
           )}
         </div>
       )}
+
+      {(plan.injury_protocols?.length ?? 0) > 0 && (
+        <div className="mb-2 animate-rise">
+          {plan.injury_protocols!.map((p) => (
+            <InjuryProtocolCard
+              key={p.region_key}
+              protocol={p}
+              busy={protocolBusy}
+              onApply={applyProtocol}
+            />
+          ))}
+        </div>
+      )}
+
+      <PainReport
+        options={plan.pain_region_options ?? []}
+        onLogged={load}
+      />
 
       {plan.nutrition_targets && typeof plan.nutrition_targets === "object" && (
         <p className="mb-3 text-[11px] text-mut">

@@ -115,12 +115,7 @@ async def act(state: AgentState) -> dict:
         from app.coaching.adapt import adaptation_for
         from app.coaching.debrief import weekly_review_payload
 
-        pain = []
-        for p in (state["profile"] or {}).get("injuries") or []:
-            if isinstance(p, str):
-                pain.append(p)
-            elif isinstance(p, dict) and p.get("region"):
-                pain.append(str(p["region"]))
+        pain = await tools.active_pain_regions(state["user_id"], state["profile"] or {})
         today_ready = (state["readiness"] or [None])[0]
         adapt = adaptation_for(today_ready, state["load"], pain)
         ctx += "\n\nADAPTATION (system-computed for today):\n" + json.dumps(adapt, indent=1)

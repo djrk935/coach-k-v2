@@ -101,6 +101,13 @@ export type TodayAdaptation = {
   reasons: string[];
   needs_checkin: boolean;
 };
+export type InjuryProtocol = {
+  region: string;
+  region_key: string;
+  steps: string[];
+  alternatives: string[];
+  volume_hint?: string;
+};
 export type TodayPlan = {
   active: boolean;
   program_id: string; program_name: string; day_index: number; cycle_count: number;
@@ -110,6 +117,8 @@ export type TodayPlan = {
   goal_mode?: string | null;
   nutrition_targets?: Record<string, unknown> | null;
   pain_regions?: string[];
+  injury_protocols?: InjuryProtocol[];
+  pain_region_options?: { key: string; label: string }[];
   travel?: boolean;
   debrief?: { headline: string; message: string; completion_pct: number; prs: string[] };
 };

@@ -451,6 +451,17 @@ async def get_recent_pain_regions(user_id: str, days: int = 7) -> list[str]:
     return [r["region"] for r in rows]
 
 
+async def active_pain_regions(user_id: str, profile: dict | None = None, days: int = 7) -> list[str]:
+    """Merge recent pain_logs with profile.injuries so Today and the agent agree."""
+    from app.coaching.injury import merge_pain_regions, regions_from_profile_injuries
+
+    if profile is None:
+        profile = await get_latest_profile(user_id)
+    logged = await get_recent_pain_regions(user_id, days=days)
+    profile_regions = regions_from_profile_injuries(profile.get("injuries"))
+    return merge_pain_regions(logged, profile_regions)
+
+
 async def days_since_last_workout(user_id: str) -> int | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -482,6 +493,7 @@ async def get_today(user_id: str) -> dict | None:
     """Everything the Today view needs: the day's plan, suggested weights,
     adaptation, form cues, swaps, and any sets already logged this session."""
     from app.coaching.adapt import adaptation_for, apply_volume_scale
+    from app.coaching.injury import build_injury_protocols, quick_region_options
     from app.coaching.progression import apply_progression_to_suggestion, progression_delta_lbs
     from app.coaching.swaps import form_cue_for, suggest_swap
     from app.coaching.warmup import warmup_ramp
@@ -498,9 +510,12 @@ async def get_today(user_id: str) -> dict | None:
     one_rms = profile.get("lifts_1rm", {})
     readiness = await get_recent_readiness(user_id, days=1)
     load = await get_load_summary(user_id)
-    pain_regions = await get_recent_pain_regions(user_id)
+    pain_regions = await active_pain_regions(user_id, profile)
     missed = await days_since_last_workout(user_id)
     adapt = adaptation_for(readiness[0] if readiness else None, load, pain_regions)
+    injury_protocols = build_injury_protocols(
+        pain_regions, intensity_note=adapt.get("intensity_note"),
+    )
 
     open_workout = await get_open_workout(user_id, prog["id"], progress["day_index"])
     logged_by_slot: dict[int, list[dict]] = {}
@@ -619,6 +634,8 @@ async def get_today(user_id: str) -> dict | None:
         "goal_mode": profile.get("goal_mode") or prog["plan"].get("goal"),
         "nutrition_targets": profile.get("nutrition_targets") or prog["plan"].get("nutrition"),
         "pain_regions": pain_regions,
+        "injury_protocols": injury_protocols,
+        "pain_region_options": quick_region_options(),
     }
 
 
@@ -764,7 +781,7 @@ async def finish_today(user_id: str, program_id: str, day_index: int, session_rp
 
     readiness = await get_recent_readiness(user_id, days=1)
     load = await get_load_summary(user_id)
-    pain = await get_recent_pain_regions(user_id)
+    pain = await active_pain_regions(user_id)
     adapt = adaptation_for(readiness[0] if readiness else None, load, pain)
     exercises = [
         {"exercise": name, "sets": len(ss), "logged_sets": ss}
@@ -815,6 +832,33 @@ async def swap_today_exercise(
     swaps[key] = day_swaps
     await apply_profile_patch(user_id, {"session_swaps": swaps})
     return {"ok": True, "slot_index": slot_index, "exercise": new_exercise}
+
+
+async def apply_protocol_swaps(
+    user_id: str, program_id: str, day_index: int, region_key: str | None = None,
+) -> dict:
+    """Apply suggest_swap for each Today slot matching active (or one) pain region."""
+    from app.coaching.swaps import normalize_region, suggest_swap
+
+    day = await get_today(user_id)
+    if not day or day.get("program_id") != program_id:
+        raise ValueError("no active today plan for that program")
+    regions = day.get("pain_regions") or []
+    if region_key:
+        key = normalize_region(region_key) or region_key
+        regions = [r for r in regions if (normalize_region(r) or r) == key]
+        if not regions:
+            regions = [region_key]
+    applied: list[dict] = []
+    for i, ex in enumerate(day.get("exercises") or []):
+        if ex.get("swapped"):
+            continue
+        alt = suggest_swap(ex["exercise"], regions)
+        if not alt:
+            continue
+        await swap_today_exercise(user_id, program_id, day_index, i, alt)
+        applied.append({"slot_index": i, "from": ex["exercise"], "to": alt})
+    return {"ok": True, "applied": applied, "count": len(applied)}
 
 
 # ===== Push subscriptions =====

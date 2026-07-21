@@ -22,7 +22,11 @@ async def _check_in_on(user_id: str) -> None:
     today_plan = await tools.get_today(user_id)
     readiness = await tools.get_recent_readiness(user_id, days=1)
     load = await tools.get_load_summary(user_id)
-    adapt = adaptation_for(readiness[0] if readiness else None, load, None)
+    adapt = adaptation_for(
+        readiness[0] if readiness else None,
+        load,
+        await tools.active_pain_regions(user_id),
+    )
 
     # HealthKit / readiness soft-day proactive note
     if adapt.get("soft_day") and today_plan:

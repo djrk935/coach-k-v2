@@ -323,6 +323,54 @@ async def today_checkin(body: CheckinIn):
     return {"ok": True, "adaptation": (day or {}).get("adaptation"), "today": day}
 
 
+class PainIn(BaseModel):
+    region: str
+    severity: int = 5
+    context: str | None = None
+
+
+@app.post("/api/today/pain")
+async def today_pain(body: PainIn):
+    """Log an active pain region from Today — surfaces injury protocol cards."""
+    from app.coaching.swaps import normalize_region
+
+    region = (body.region or "").strip()
+    if not region:
+        raise HTTPException(400, "region required")
+    severity = max(0, min(10, int(body.severity)))
+    user_id = await tools.get_or_create_user()
+    # Store normalized label when we recognize it so cards dedupe cleanly
+    key = normalize_region(region)
+    await tools.log_pain(user_id, key or region, severity, body.context)
+    day = await tools.get_today(user_id)
+    return {
+        "ok": True,
+        "region": key or region,
+        "injury_protocols": (day or {}).get("injury_protocols") or [],
+        "today": day,
+    }
+
+
+class ApplyProtocolIn(BaseModel):
+    program_id: str
+    day_index: int
+    region_key: str | None = None
+
+
+@app.post("/api/today/apply-protocol-swaps")
+async def today_apply_protocol_swaps(body: ApplyProtocolIn):
+    """Bulk-apply suggested swaps for one (or all) active pain regions."""
+    user_id = await tools.get_or_create_user()
+    try:
+        result = await tools.apply_protocol_swaps(
+            user_id, body.program_id, body.day_index, body.region_key,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    day = await tools.get_today(user_id)
+    return {**result, "today": day}
+
+
 @app.get("/api/coach/weekly-review")
 async def weekly_review():
     from app.coaching.debrief import weekly_review_payload
