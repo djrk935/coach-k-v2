@@ -261,25 +261,30 @@ export default function App() {
     <div className="flex h-full">
       {/* ===== Main column ===== */}
       <main className="flex flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-line px-4 py-3">
-          <span className="font-black tracking-[0.3em] text-brand">COACH K</span>
-          <select
-            value={chatId ?? ""}
-            onChange={(e) => selectChat(e.target.value)}
-            className="max-w-40 rounded-lg border border-line bg-panel px-2 py-1.5 text-xs outline-none"
-          >
-            {chats.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={newChat}
-            className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
-          >
-            + New
-          </button>
+        <header className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:gap-3 sm:px-4 sm:py-3">
+          <span className="text-sm font-black tracking-[0.25em] text-brand sm:text-base sm:tracking-[0.3em]">
+            COACH K
+          </span>
+          {/* On phones this group wraps to its own full-width row */}
+          <div className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
+            <select
+              value={chatId ?? ""}
+              onChange={(e) => selectChat(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1.5 text-xs outline-none sm:max-w-40 sm:flex-none"
+            >
+              {chats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={newChat}
+              className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
+            >
+              + New
+            </button>
+          </div>
           <div className="flex-1" />
           <nav className="flex gap-1 rounded-lg border border-line p-0.5">
             {(["today", "chat", "templates"] as const).map((v) => (
@@ -316,7 +321,7 @@ export default function App() {
           />
         ) : (
           <>
-            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
               {msgs.length === 0 && (
                 <div className="mt-24 text-center text-mut">
                   <p className="text-lg">What are we training for?</p>
@@ -341,7 +346,7 @@ export default function App() {
               <div ref={bottomRef} />
             </div>
 
-            <footer className="border-t border-line p-4">
+            <footer className="border-t border-line p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-4">
               {images.length > 0 && (
                 <div className="mb-2 flex gap-2">
                   {images.map((u, i) => (

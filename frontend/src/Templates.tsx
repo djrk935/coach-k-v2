@@ -38,7 +38,7 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
 
   if (open) {
     return (
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-white">
           ← All templates
         </button>
@@ -76,7 +76,7 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-6">
+    <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
       <h2 className="text-xl font-black">Plan Templates</h2>
       <p className="mt-1 text-sm text-mut">
         Book-grounded starting points. Pick one and Coach K adapts it to your profile, lifts, and readiness.

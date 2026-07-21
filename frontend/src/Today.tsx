@@ -230,7 +230,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const allDone = plan.exercises.every((ex) => ex.logged_sets.length >= ex.sets);
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-6">
+    <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black">{plan.day_label}</h2>

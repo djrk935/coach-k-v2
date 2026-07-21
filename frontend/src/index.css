@@ -9,4 +9,15 @@
 }
 
 html, body, #root { height: 100%; }
-body { background: var(--color-ink); color: #e7e7ea; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--color-ink);
+  color: #e7e7ea;
+  overflow-x: hidden; /* an overflowing element must never zoom the page out */
+}
+
+/* iOS Safari zooms the page when focusing form fields under 16px — keep
+   controls at 16px on phones so focus never triggers zoom. */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
+}

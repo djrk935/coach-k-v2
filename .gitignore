@@ -14,3 +14,4 @@ ios/build/
 ios/CoachK.xcodeproj/
 
 .DS_Store
+*.dump
