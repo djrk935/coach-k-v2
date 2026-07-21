@@ -389,7 +389,12 @@ export default function App() {
           )}
           <div className="flex-1" />
           <nav className="flex gap-0.5 rounded-xl border border-line bg-panel/50 p-0.5">
-            {(["today", "chat", "templates", "about"] as const).map((v) => (
+            {([
+              ["today", "today"],
+              ["chat", "chat"],
+              ["templates", "plans"],
+              ["about", "about"],
+            ] as const).map(([v, label]) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -397,7 +402,7 @@ export default function App() {
                   view === v ? "bg-brand text-white" : "text-mut hover:text-white"
                 }`}
               >
-                {v}
+                {label}
               </button>
             ))}
           </nav>

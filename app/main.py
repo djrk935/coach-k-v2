@@ -188,8 +188,19 @@ async def chat_messages(chat_id: str, request: Request):
 # ===== Today's Workout (living plan, one-tap + voice logging) =====
 
 @app.get("/api/today")
-async def today():
+async def today(travel: str | None = None):
     user_id = await tools.get_or_create_user()
+    if travel:
+        from app.coaching.travel import travel_day
+        from app.exercises.resolver import media_for
+        from app.coaching.swaps import form_cue_for
+
+        day = travel_day(travel)
+        for ex in day["exercises"]:
+            m = media_for(ex["exercise"])
+            ex["image_urls"] = m["image_urls"] if m else []
+            ex["form_cue"] = form_cue_for(ex["exercise"])
+        return day
     day = await tools.get_today(user_id)
     if not day:
         return {"active": False}
@@ -261,8 +272,67 @@ class FinishTodayIn(BaseModel):
 @app.post("/api/today/finish")
 async def today_finish(body: FinishTodayIn):
     user_id = await tools.get_or_create_user()
-    await tools.finish_today(user_id, body.program_id, body.day_index, body.session_rpe)
-    return {"ok": True}
+    return await tools.finish_today(user_id, body.program_id, body.day_index, body.session_rpe)
+
+
+class CatchUpIn(BaseModel):
+    program_id: str
+    action: str  # resume | repeat_last | light_makeup
+
+
+@app.post("/api/today/catch-up")
+async def today_catch_up(body: CatchUpIn):
+    if body.action not in ("resume", "repeat_last", "light_makeup"):
+        raise HTTPException(400, "action must be resume | repeat_last | light_makeup")
+    user_id = await tools.get_or_create_user()
+    return await tools.apply_catch_up(user_id, body.program_id, body.action)
+
+
+class SwapIn(BaseModel):
+    program_id: str
+    day_index: int
+    slot_index: int
+    new_exercise: str
+
+
+@app.post("/api/today/swap")
+async def today_swap(body: SwapIn):
+    user_id = await tools.get_or_create_user()
+    return await tools.swap_today_exercise(
+        user_id, body.program_id, body.day_index, body.slot_index, body.new_exercise,
+    )
+
+
+class CheckinIn(BaseModel):
+    sleep_h: float | None = None
+    soreness_0_10: int | None = None
+    stress_0_10: int | None = None
+    motivation_0_10: int | None = None
+    notes: str | None = None
+
+
+@app.post("/api/today/checkin")
+async def today_checkin(body: CheckinIn):
+    """Subjective pre-session readiness — drives Today adaptation."""
+    user_id = await tools.get_or_create_user()
+    entry = body.model_dump(exclude_none=True)
+    if not entry:
+        raise HTTPException(400, "provide at least one readiness field")
+    await tools.upsert_readiness(user_id, entry)
+    day = await tools.get_today(user_id)
+    return {"ok": True, "adaptation": (day or {}).get("adaptation"), "today": day}
+
+
+@app.get("/api/coach/weekly-review")
+async def weekly_review():
+    from app.coaching.debrief import weekly_review_payload
+
+    user_id = await tools.get_or_create_user()
+    profile = await tools.get_latest_profile(user_id)
+    readiness = await tools.get_recent_readiness(user_id, days=14)
+    load = await tools.get_load_summary(user_id)
+    prs = await tools.recent_prs(user_id, days=14)
+    return weekly_review_payload(profile, readiness, load, [], prs)
 
 
 # ===== Readiness (HealthKit sync) =====
@@ -330,6 +400,7 @@ async def templates():
     out = []
     for t in TEMPLATES:
         t = json.loads(json.dumps(t))  # deep copy
+        t.setdefault("source_type", "book")
         for day in t["days"]:
             for ex in day["exercises"]:
                 m = media_for(ex["name"])

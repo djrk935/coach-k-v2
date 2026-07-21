@@ -3,7 +3,6 @@ import { api, Template, TemplateEx } from "./api";
 
 const GOALS = ["all", "strength", "hypertrophy", "athleticism", "general"] as const;
 
-// Start/end frames flipped on a timer — the "GIF" treatment.
 export function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }) {
   const [f, setF] = useState(0);
   useEffect(() => {
@@ -17,6 +16,7 @@ export function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }
       src={urls[f] ?? urls[0]}
       style={{ width: size, height: size }}
       className="shrink-0 rounded-lg border border-line bg-white object-cover"
+      alt=""
     />
   );
 }
@@ -40,21 +40,24 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
     return (
       <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-white">
-          ← All templates
+          ← All plans
         </button>
-        <h2 className="font-display text-xl font-black tracking-tight">{open.name}</h2>
-        <p className="mt-1 text-sm text-mut">{open.summary}</p>
-        <p className="mt-1 text-xs text-brand">{open.based_on}</p>
+        <p className="font-display text-xs font-semibold tracking-[0.25em] text-brand">
+          {(open.source_type || "book").toUpperCase()} · {open.days_per_week} DAYS/WK
+        </p>
+        <h2 className="mt-2 font-display text-xl font-black tracking-tight sm:text-2xl">{open.name}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-mut">{open.summary}</p>
+        <p className="mt-2 text-xs leading-relaxed text-brand">{open.based_on}</p>
         <button
           onClick={() => onPersonalize(open.name)}
-          className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white"
+          className="mt-5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white"
         >
           Have Coach K personalize this →
         </button>
         <div className="mt-6 space-y-6">
           {open.days.map((d) => (
-            <section key={d.label} className="rounded-xl bg-panel p-4">
-              <h3 className="mb-3 font-bold">{d.label}</h3>
+            <section key={d.label} className="rounded-xl border border-line/70 bg-panel p-4">
+              <h3 className="mb-3 font-display font-bold">{d.label}</h3>
               <ul className="space-y-3">
                 {d.exercises.map((ex: TemplateEx) => (
                   <li key={ex.name} className="flex items-center gap-3">
@@ -87,10 +90,12 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
         <div className="relative px-5 py-8 sm:px-7 sm:py-10">
           <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">LIBRARY</p>
           <h2 className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">
-            Plan Templates
+            Pre-Made Plans
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/70">
-            Book-grounded starting points. Pick one and Coach K adapts it to your profile, lifts, and readiness.
+            Book-inspired and coach-tested starting points — Starting Strength lineage, Prilepin
+            zones, Helms volume landmarks, Jump Attack athleticism, PPL, and more. Pick one;
+            Coach K personalizes it to your 1RMs and readiness.
           </p>
         </div>
       </div>
@@ -107,7 +112,8 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
           </button>
         ))}
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <p className="mt-3 text-xs text-mut">{shown.length} plans</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {shown.map((t) => (
           <button
             key={t.id}
@@ -117,8 +123,10 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
             <p className="font-display font-bold">{t.name}</p>
             <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-brand">
               {t.goal} · {t.days_per_week} days/wk
+              {t.source_type ? ` · ${t.source_type}` : ""}
             </p>
-            <p className="mt-2 text-sm text-mut">{t.summary}</p>
+            <p className="mt-2 line-clamp-3 text-sm text-mut">{t.summary}</p>
+            <p className="mt-2 text-[11px] leading-snug text-white/40">{t.based_on}</p>
           </button>
         ))}
       </div>

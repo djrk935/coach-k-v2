@@ -25,7 +25,10 @@ _fast = ChatAnthropic(
     model=settings.fast_model, api_key=settings.anthropic_api_key, max_tokens=2048
 )
 
-_INTENTS = {"program_request", "log", "coaching_qa", "checkin"}
+_INTENTS = {
+    "program_request", "log", "coaching_qa", "checkin",
+    "adapt_today", "deload", "review_block", "travel",
+}
 
 
 def _sys(text: str, cache: bool = False) -> dict:
@@ -107,6 +110,31 @@ async def act(state: AgentState) -> dict:
     ctx = tools.format_context(
         state["profile"], state["readiness"], state["load"], state.get("sources")
     )
+    # Enrich context with living coaching signals when available.
+    try:
+        from app.coaching.adapt import adaptation_for
+        from app.coaching.debrief import weekly_review_payload
+
+        pain = []
+        for p in (state["profile"] or {}).get("injuries") or []:
+            if isinstance(p, str):
+                pain.append(p)
+            elif isinstance(p, dict) and p.get("region"):
+                pain.append(str(p["region"]))
+        today_ready = (state["readiness"] or [None])[0]
+        adapt = adaptation_for(today_ready, state["load"], pain)
+        ctx += "\n\nADAPTATION (system-computed for today):\n" + json.dumps(adapt, indent=1)
+        if state["intent"] == "review_block":
+            review = weekly_review_payload(
+                state["profile"] or {},
+                state["readiness"] or [],
+                state["load"] or {},
+                [],
+                [],
+            )
+            ctx += "\n\nWEEKLY REVIEW DRAFT:\n" + review["message"]
+    except Exception:
+        pass
 
     if state["intent"] == "program_request":
         structured = _llm.with_structured_output(WorkoutPlan)
@@ -121,6 +149,11 @@ async def act(state: AgentState) -> dict:
         valid = set(state.get("retrieved_ids", []))
         plan.citations = [c for c in plan.citations if c.chunk_id in valid]
         program_id = await tools.save_program(state["user_id"], plan)
+        # Persist nutrition targets onto profile for ongoing check-ins.
+        if plan.nutrition:
+            await tools.apply_profile_patch(state["user_id"], {
+                "nutrition_targets": plan.nutrition.model_dump(),
+            })
         ack = (
             f"**{plan.program_name}** is built — {plan.mesocycle_weeks} weeks, "
             f"{plan.periodization_model} periodization, grounded in "
@@ -205,10 +238,17 @@ async def act(state: AgentState) -> dict:
         )
         return {"messages": [res]}
 
-    # coaching_qa / checkin — grounded conversational reply (streams)
+    intent_system = {
+        "adapt_today": prompts.ADAPT_SYSTEM,
+        "deload": prompts.DELOAD_SYSTEM,
+        "review_block": prompts.REVIEW_SYSTEM,
+        "travel": prompts.TRAVEL_SYSTEM,
+    }.get(state["intent"], prompts.COACH_SYSTEM)
+
+    # coaching_qa / checkin / adapt / deload / review / travel
     res = await _llm.ainvoke(
         [
-            _sys(prompts.COACH_SYSTEM, cache=True),
+            _sys(intent_system, cache=True),
             _sys(ctx, cache=True),
             *state["messages"],
         ]
@@ -232,7 +272,9 @@ async def update_memory(state: AgentState) -> dict:
 
 
 def _needs_sources(state: AgentState) -> str:
-    return "retrieve" if state["intent"] in ("program_request", "coaching_qa") else "act"
+    return "retrieve" if state["intent"] in (
+        "program_request", "coaching_qa", "adapt_today", "deload", "travel",
+    ) else "act"
 
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None):

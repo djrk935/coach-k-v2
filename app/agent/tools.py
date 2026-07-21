@@ -439,9 +439,52 @@ async def get_open_workout(user_id: str, program_id: str, day_index: int) -> dic
     return {"workout_id": row["id"], "sets": [dict(s) for s in sets]}
 
 
+async def get_recent_pain_regions(user_id: str, days: int = 7) -> list[str]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT DISTINCT region FROM pain_logs
+               WHERE user_id = $1 AND logged_at > now() - ($2::text || ' days')::interval
+               ORDER BY region""",
+            user_id, days,
+        )
+    return [r["region"] for r in rows]
+
+
+async def days_since_last_workout(user_id: str) -> int | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        last = await conn.fetchval(
+            "SELECT MAX(performed_at) FROM workouts WHERE user_id = $1", user_id
+        )
+    if not last:
+        return None
+    from datetime import datetime, timezone
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - last).days
+
+
+async def recent_prs(user_id: str, days: int = 14) -> list[str]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT DISTINCT ws.exercise FROM workout_sets ws
+               JOIN workouts w ON w.id = ws.workout_id
+               WHERE w.user_id = $1 AND ws.is_pr
+                     AND w.performed_at > now() - ($2::text || ' days')::interval""",
+            user_id, days,
+        )
+    return [r["exercise"] for r in rows]
+
+
 async def get_today(user_id: str) -> dict | None:
     """Everything the Today view needs: the day's plan, suggested weights,
-    and any sets already logged this session."""
+    adaptation, form cues, swaps, and any sets already logged this session."""
+    from app.coaching.adapt import adaptation_for, apply_volume_scale
+    from app.coaching.progression import apply_progression_to_suggestion, progression_delta_lbs
+    from app.coaching.swaps import form_cue_for, suggest_swap
+
     prog = await get_active_program(user_id)
     if not prog:
         return None
@@ -450,12 +493,15 @@ async def get_today(user_id: str) -> dict | None:
         return None
     progress = await get_or_init_progress(user_id, prog["id"])
     day = days[progress["day_index"] % len(days)]
-    one_rms = (await get_latest_profile(user_id)).get("lifts_1rm", {})
+    profile = await get_latest_profile(user_id)
+    one_rms = profile.get("lifts_1rm", {})
+    readiness = await get_recent_readiness(user_id, days=1)
+    load = await get_load_summary(user_id)
+    pain_regions = await get_recent_pain_regions(user_id)
+    missed = await days_since_last_workout(user_id)
+    adapt = adaptation_for(readiness[0] if readiness else None, load, pain_regions)
 
     open_workout = await get_open_workout(user_id, prog["id"], progress["day_index"])
-    # Keyed by slot (position in day.exercises), NOT exercise name — a day can
-    # list the same lift twice (warmup + working sets) and those must track
-    # independently, or logging one silently completes both.
     logged_by_slot: dict[int, list[dict]] = {}
     for s in (open_workout or {}).get("sets", []):
         if s["slot_index"] is not None:
@@ -463,16 +509,88 @@ async def get_today(user_id: str) -> dict | None:
 
     from app.exercises.resolver import media_for
 
+    raw_exercises = list(day.get("exercises", []))
+    # Apply one-session exercise swaps from profile
+    session_swaps = (profile.get("session_swaps") or {}).get(
+        f"{prog['id']}:{progress['day_index']}", {}
+    )
+    if session_swaps:
+        patched = []
+        for i, ex in enumerate(raw_exercises):
+            row = dict(ex)
+            if str(i) in session_swaps:
+                row["exercise"] = session_swaps[str(i)]
+                row["swapped"] = True
+            patched.append(row)
+        raw_exercises = patched
+
+    override = profile.get("today_override") or {}
+    if override.get("soft_day"):
+        adapt = {**adapt, "soft_day": True, "volume_scale": min(adapt["volume_scale"], 0.65)}
+        adapt["reasons"] = list(adapt.get("reasons") or []) + ["Light makeup session selected."]
+
+    scaled = apply_volume_scale(raw_exercises, adapt["volume_scale"])
+
     exercises = []
-    for i, ex in enumerate(day.get("exercises", [])):
+    for i, ex in enumerate(scaled):
         last = await get_last_weight(user_id, ex["exercise"])
         media = media_for(ex["exercise"])
+        logged = logged_by_slot.get(i, [])
+        prog_hint = progression_delta_lbs(
+            ex["exercise"], ex.get("intensity", ""), logged or [],
+            int(ex.get("sets") or 1), ex.get("reps", ""),
+        )
+        # Also peek at last completed session for this exercise for next-session bump
+        if not prog_hint and not logged:
+            # Use historical last workout sets via last weight only; bump stored in notes if prior clear
+            prog_hint = None
+        suggested = _suggest_weight(ex["exercise"], ex.get("intensity", ""), one_rms, last)
+        suggested = apply_progression_to_suggestion(suggested, prog_hint)
+        swap = suggest_swap(ex["exercise"], pain_regions) if pain_regions else None
         exercises.append({
             **ex,
-            "suggested_weight_lbs": _suggest_weight(ex["exercise"], ex.get("intensity", ""), one_rms, last),
-            "logged_sets": logged_by_slot.get(i, []),
+            "suggested_weight_lbs": suggested,
+            "logged_sets": logged,
             "image_urls": media["image_urls"] if media else [],
+            "form_cue": form_cue_for(ex["exercise"]),
+            "swap_suggestion": swap,
+            "progression": prog_hint,
         })
+
+    catch_up = None
+    if missed is not None and missed >= 3:
+        catch_up = {
+            "days_missed": missed,
+            "options": [
+                "resume",  # continue rotation as scheduled
+                "repeat_last",  # stay on current day_index
+                "light_makeup",  # soft_day forced
+            ],
+            "message": (
+                f"It's been {missed} days since your last session. "
+                "Resume the plan, repeat this day, or take a light makeup session."
+            ),
+        }
+        if missed >= 5:
+            adapt = {**adapt, "soft_day": True, "volume_scale": min(adapt["volume_scale"], 0.7)}
+            adapt["reasons"] = list(adapt.get("reasons") or []) + [
+                f"{missed} days off — easing back in."
+            ]
+            exercises = []
+            for i, ex in enumerate(apply_volume_scale(raw_exercises, adapt["volume_scale"])):
+                last = await get_last_weight(user_id, ex["exercise"])
+                media = media_for(ex["exercise"])
+                exercises.append({
+                    **ex,
+                    "suggested_weight_lbs": _suggest_weight(
+                        ex["exercise"], ex.get("intensity", ""), one_rms, last
+                    ),
+                    "logged_sets": logged_by_slot.get(i, []),
+                    "image_urls": media["image_urls"] if media else [],
+                    "form_cue": form_cue_for(ex["exercise"]),
+                    "swap_suggestion": suggest_swap(ex["exercise"], pain_regions) if pain_regions else None,
+                    "progression": None,
+                })
 
     return {
         "program_id": prog["id"],
@@ -483,6 +601,11 @@ async def get_today(user_id: str) -> dict | None:
         "focus": day.get("focus"),
         "exercises": exercises,
         "workout_id": (open_workout or {}).get("workout_id"),
+        "adaptation": adapt,
+        "catch_up": catch_up,
+        "goal_mode": profile.get("goal_mode") or prog["plan"].get("goal"),
+        "nutrition_targets": profile.get("nutrition_targets") or prog["plan"].get("nutrition"),
+        "pain_regions": pain_regions,
     }
 
 
@@ -575,7 +698,10 @@ async def resolve_open_slot(
     return open_matches[0]
 
 
-async def finish_today(user_id: str, program_id: str, day_index: int, session_rpe: float | None) -> None:
+async def finish_today(user_id: str, program_id: str, day_index: int, session_rpe: float | None) -> dict:
+    from app.coaching.adapt import adaptation_for
+    from app.coaching.debrief import session_debrief
+
     pool = await get_pool()
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
@@ -596,6 +722,86 @@ async def finish_today(user_id: str, program_id: str, day_index: int, session_rp
                WHERE user_id = $1 AND program_id = $2""",
             user_id, program_id, next_index, next_cycle_incr,
         )
+        # Collect PRs + sets from today's workout for debrief
+        row = await conn.fetchrow(
+            """SELECT id FROM workouts WHERE user_id = $1 AND program_id = $2
+                     AND program_day_index = $3 AND performed_at::date = CURRENT_DATE
+               ORDER BY performed_at DESC LIMIT 1""",
+            user_id, program_id, day_index,
+        )
+        prs: list[str] = []
+        sets_by_ex: dict[str, list] = {}
+        day_label = "Today"
+        focus = ""
+        if row:
+            sets = await conn.fetch(
+                """SELECT exercise, weight_lbs, reps, rir, is_pr FROM workout_sets
+                   WHERE workout_id = $1 ORDER BY set_index""",
+                row["id"],
+            )
+            for s in sets:
+                sets_by_ex.setdefault(s["exercise"], []).append(dict(s))
+                if s["is_pr"]:
+                    prs.append(s["exercise"])
+        plan = json.loads(prog)
+        days = plan.get("weekly_split", [])
+        if 0 <= day_index < len(days):
+            day_label = days[day_index].get("day_label", day_label)
+            focus = days[day_index].get("focus", "")
+
+    readiness = await get_recent_readiness(user_id, days=1)
+    load = await get_load_summary(user_id)
+    pain = await get_recent_pain_regions(user_id)
+    adapt = adaptation_for(readiness[0] if readiness else None, load, pain)
+    exercises = [
+        {"exercise": name, "sets": len(ss), "logged_sets": ss}
+        for name, ss in sets_by_ex.items()
+    ]
+    # Include planned set counts when possible
+    if 0 <= day_index < len(days):
+        planned = {ex["exercise"]: ex for ex in days[day_index].get("exercises", [])}
+        exercises = [
+            {
+                "exercise": ex["exercise"],
+                "sets": planned.get(ex["exercise"], {}).get("sets", ex["sets"]),
+                "logged_sets": sets_by_ex.get(ex["exercise"], []),
+            }
+            for ex in days[day_index].get("exercises", [])
+        ]
+
+    debrief = session_debrief(day_label, exercises, load, sorted(set(prs)), adapt)
+    debrief["focus"] = focus
+    return {"ok": True, "debrief": debrief}
+
+
+async def apply_catch_up(user_id: str, program_id: str, action: str) -> dict:
+    """resume | repeat_last | light_makeup — adjusts program_progress / soft flag."""
+    progress = await get_or_init_progress(user_id, program_id)
+    pool = await get_pool()
+    if action == "repeat_last":
+        # Stay on current day_index (already there) — no-op progress-wise
+        await apply_profile_patch(user_id, {"today_override": {"soft_day": False, "action": action}})
+        return {"ok": True, "day_index": progress["day_index"], "action": action}
+    if action == "light_makeup":
+        await apply_profile_patch(user_id, {"today_override": {"soft_day": True, "action": action}})
+        return {"ok": True, "day_index": progress["day_index"], "action": action}
+    # resume — clear override
+    await apply_profile_patch(user_id, {"today_override": {}})
+    return {"ok": True, "day_index": progress["day_index"], "action": "resume"}
+
+
+async def swap_today_exercise(
+    user_id: str, program_id: str, day_index: int, slot_index: int, new_exercise: str,
+) -> dict:
+    """Record a one-day exercise swap on the profile override map (UI reads it via get_today)."""
+    key = f"{program_id}:{day_index}"
+    profile = await get_latest_profile(user_id)
+    swaps = dict(profile.get("session_swaps") or {})
+    day_swaps = dict(swaps.get(key) or {})
+    day_swaps[str(slot_index)] = new_exercise
+    swaps[key] = day_swaps
+    await apply_profile_patch(user_id, {"session_swaps": swaps})
+    return {"ok": True, "slot_index": slot_index, "exercise": new_exercise}
 
 
 # ===== Push subscriptions =====

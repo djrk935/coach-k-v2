@@ -79,11 +79,32 @@ export type TodayExercise = {
   tempo: string | null; rest_s: number | null; notes: string | null;
   set_type: string; superset_group: string | null;
   suggested_weight_lbs: number | null; logged_sets: LoggedSet[]; image_urls: string[];
+  form_cue?: string | null;
+  swap_suggestion?: string | null;
+  progression?: { delta_lbs: number; reason: string } | null;
+  adapted?: boolean;
+  swapped?: boolean;
+};
+export type TodayAdaptation = {
+  score: number | null;
+  status: string;
+  volume_scale: number;
+  soft_day: boolean;
+  intensity_note: string;
+  reasons: string[];
+  needs_checkin: boolean;
 };
 export type TodayPlan = {
   active: boolean;
   program_id: string; program_name: string; day_index: number; cycle_count: number;
   day_label: string; focus: string; exercises: TodayExercise[]; workout_id: string | null;
+  adaptation?: TodayAdaptation;
+  catch_up?: { days_missed: number; options: string[]; message: string } | null;
+  goal_mode?: string | null;
+  nutrition_targets?: Record<string, unknown> | null;
+  pain_regions?: string[];
+  travel?: boolean;
+  debrief?: { headline: string; message: string; completion_pct: number; prs: string[] };
 };
 
 export type TemplateEx = {
@@ -91,6 +112,6 @@ export type TemplateEx = {
 };
 export type Template = {
   id: string; name: string; goal: string; days_per_week: number;
-  summary: string; based_on: string;
+  summary: string; based_on: string; source_type?: string;
   days: { label: string; exercises: TemplateEx[] }[];
 };
