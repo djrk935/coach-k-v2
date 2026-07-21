@@ -1,11 +1,15 @@
 /**
  * About Coach K — Dayan Kijege.
  * In-app story (same narrative as the public landing).
- * Photo: /public/images/coach-dayan.jpg — replace with speaking photo anytime.
+ *
+ * Photo: prefers /images/coach-dayan-speaking.jpg when present,
+ * else /images/coach-dayan.jpg. Drop your speaking headshot as
+ * coach-dayan-speaking.jpg anytime to upgrade the hero.
  */
 
 import { CoachStorySections } from "./CoachStory";
 
+const SPEAKING_PHOTO = "/images/coach-dayan-speaking.jpg";
 const COACH_PHOTO = "/images/coach-dayan.jpg";
 const HERO_FALLBACK = "/images/hero-barbell.jpg";
 
@@ -14,12 +18,13 @@ export default function About({ onTalk }: { onTalk: () => void }) {
     <div className="flex-1 overflow-y-auto">
       <section className="relative min-h-[70vh] overflow-hidden sm:min-h-[78vh]">
         <img
-          src={COACH_PHOTO}
+          src={SPEAKING_PHOTO}
           alt="Dayan Kijege — Coach K"
-          className="absolute inset-0 h-full w-full object-cover object-top sm:object-[center_15%]"
+          className="absolute inset-0 h-full w-full object-cover object-top sm:object-[center_18%]"
           onError={(e) => {
             const el = e.currentTarget;
-            if (el.src.endsWith("coach-dayan.jpg")) el.src = HERO_FALLBACK;
+            if (el.src.includes("speaking")) el.src = COACH_PHOTO;
+            else if (el.src.includes("coach-dayan")) el.src = HERO_FALLBACK;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/75 to-ink/25" />

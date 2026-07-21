@@ -7,6 +7,7 @@ import { useState } from "react";
 import { CoachStorySections } from "./CoachStory";
 
 const HERO = "/images/training-floor.jpg";
+const SPEAKING = "/images/coach-dayan-speaking.jpg";
 const PORTRAIT = "/images/coach-dayan.jpg";
 
 export default function Landing({
@@ -66,11 +67,13 @@ export default function Landing({
         <div className="mx-auto grid max-w-5xl items-center gap-8 px-5 py-12 sm:grid-cols-[minmax(0,220px)_1fr] sm:px-8 sm:py-16">
           <div className="relative mx-auto aspect-[3/4] w-48 overflow-hidden rounded-2xl sm:mx-0 sm:w-full">
             <img
-              src={PORTRAIT}
+              src={SPEAKING}
               alt="Dayan Kijege — Coach K"
               className="h-full w-full object-cover object-top"
               onError={(e) => {
-                e.currentTarget.src = "/images/hero-barbell.jpg";
+                const el = e.currentTarget;
+                if (el.src.includes("speaking")) el.src = PORTRAIT;
+                else el.src = "/images/hero-barbell.jpg";
               }}
             />
           </div>

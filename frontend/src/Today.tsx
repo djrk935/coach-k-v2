@@ -9,6 +9,7 @@ import {
   videoToFrameDataUrls,
 } from "./api";
 import RestTimer from "./RestTimer";
+import { formatSessionShare, shareContent } from "./share";
 import { FlipImage } from "./Templates";
 
 function parseRepTarget(reps: string): number | undefined {
@@ -504,6 +505,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const [heard, setHeard] = useState("");
   const [restFor, setRestFor] = useState<number | null>(null);
   const [protocolBusy, setProtocolBusy] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
 
   const load = () =>
@@ -670,17 +672,45 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
               {debrief.message.replace(/\*\*/g, "")}
             </p>
           )}
-          <button
-            onClick={() => {
-              setFinished(false);
-              setDebrief(null);
-              setLoading(true);
-              load();
-            }}
-            className="mt-6 rounded-xl border border-line px-5 py-2.5 text-sm font-semibold hover:border-brand"
-          >
-            See what's next →
-          </button>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const payload = formatSessionShare({
+                  day_label: plan?.day_label,
+                  focus: plan?.focus,
+                  program_name: plan?.program_name,
+                  exercises: plan?.exercises,
+                  debrief,
+                });
+                const result = await shareContent(payload);
+                setShareMsg(
+                  result === "shared"
+                    ? "Shared."
+                    : result === "copied"
+                      ? "Copied to clipboard."
+                      : "Couldn't share — copy manually from the debrief.",
+                );
+              }}
+              className="ck-btn ck-btn-primary"
+            >
+              Share session
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFinished(false);
+                setDebrief(null);
+                setShareMsg("");
+                setLoading(true);
+                load();
+              }}
+              className="ck-btn ck-btn-ghost"
+            >
+              See what&apos;s next →
+            </button>
+          </div>
+          {shareMsg && <p className="mt-3 text-xs text-mut">{shareMsg}</p>}
         </div>
       </div>
     );

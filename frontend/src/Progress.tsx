@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
+import { formatProgressShare, formatWeeklyReviewShare, shareContent } from "./share";
 
 type Point = { date: string; value: number };
 type LiftSeries = {
@@ -111,6 +112,7 @@ export default function Progress() {
   const [days, setDays] = useState(90);
   const [loading, setLoading] = useState(true);
   const [liftKey, setLiftKey] = useState<string>("squat");
+  const [shareMsg, setShareMsg] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -127,6 +129,23 @@ export default function Progress() {
       .catch(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
+
+  async function shareProgress() {
+    if (!data) return;
+    const result = await shareContent(formatProgressShare(data));
+    setShareMsg(result === "shared" ? "Shared." : result === "copied" ? "Copied." : "Share unavailable.");
+  }
+
+  async function shareWeekly() {
+    const r = await api("/api/coach/weekly-review");
+    if (!r.ok) {
+      setShareMsg("Weekly review unavailable.");
+      return;
+    }
+    const review = await r.json();
+    const result = await shareContent(formatWeeklyReviewShare(review));
+    setShareMsg(result === "shared" ? "Shared." : result === "copied" ? "Copied." : "Share unavailable.");
+  }
 
   if (loading && !data) {
     return <div className="flex-1" />;
@@ -175,20 +194,29 @@ export default function Progress() {
               {data.goal_mode ? ` · ${data.goal_mode}` : ""}
             </p>
           </div>
-          <div className="flex gap-1 rounded-xl border border-line bg-panel/50 p-0.5">
-            {[30, 90, 180].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                  days === d ? "bg-brand text-white" : "text-mut hover:text-white"
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={shareProgress} className="ck-btn ck-btn-ghost py-1.5 text-xs">
+              Share
+            </button>
+            <button type="button" onClick={shareWeekly} className="ck-btn ck-btn-ghost py-1.5 text-xs">
+              Weekly review
+            </button>
+            <div className="flex gap-1 rounded-xl border border-line bg-panel/50 p-0.5">
+              {[30, 90, 180].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                    days === d ? "bg-brand text-white" : "text-mut hover:text-white"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+        {shareMsg && <p className="mt-2 text-xs text-mut">{shareMsg}</p>}
       </div>
 
       {/* Strength — one section */}

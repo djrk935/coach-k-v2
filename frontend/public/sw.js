@@ -1,9 +1,9 @@
 // Coach K service worker — installability, web push, and offline app shell.
 // Authenticated /api traffic stays network-only (except public exercise images).
 
-const SHELL = "coachk-shell-v2";
-const ASSETS = "coachk-assets-v2";
-const MEDIA = "coachk-media-v2";
+const SHELL = "coachk-shell-v3";
+const ASSETS = "coachk-assets-v3";
+const MEDIA = "coachk-media-v3";
 
 const PRECACHE = [
   "/",
@@ -20,6 +20,7 @@ const PRECACHE = [
   "/images/atmosphere-rack.jpg",
   "/images/rack-focus.jpg",
   "/images/coach-dayan.jpg",
+  "/images/coach-dayan-speaking.jpg",
 ];
 
 self.addEventListener("install", (event) => {

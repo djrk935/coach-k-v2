@@ -9,7 +9,13 @@ final class TodayModel {
     var syncing = false
     var error: String?
     var finished = false
+    var debrief: SessionDebrief?
     var lastHeard = ""
+    var shareText = ""
+    var showShare = false
+    var checkinSleep = "7"
+    var checkinSoreness = "3"
+    var checkinStress = "3"
     let voice = VoiceLogger()
 
     func load() async {
@@ -22,7 +28,6 @@ final class TodayModel {
         readiness = try? await API.get("/api/readiness/today") as ReadinessToday
         loading = false
 
-        // Auto-sync once per day if the athlete has connected Apple Health.
         let connected = UserDefaults.standard.bool(forKey: "healthConnected")
         let lastSync = UserDefaults.standard.string(forKey: "lastHealthSync")
         if connected, lastSync != Self.todayKey {
@@ -41,8 +46,51 @@ final class TodayModel {
         if let result = await HealthKitManager.shared.sync() {
             readiness = result
             UserDefaults.standard.set(Self.todayKey, forKey: "lastHealthSync")
+            await load()
         }
         syncing = false
+    }
+
+    func submitCheckin() async {
+        do {
+            let _: OkResult = try await API.post(
+                "/api/today/checkin",
+                body: CheckinBody(
+                    sleepH: Double(checkinSleep),
+                    soreness: Int(checkinSoreness),
+                    stress: Int(checkinStress)
+                )
+            )
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func catchUp(_ action: String) async {
+        guard let plan, let pid = plan.programId else { return }
+        do {
+            let _: OkResult = try await API.post(
+                "/api/today/catch-up",
+                body: CatchUpBody(programId: pid, action: action)
+            )
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func swap(slot: Int, to newExercise: String) async {
+        guard let plan, let pid = plan.programId, let day = plan.dayIndex else { return }
+        do {
+            let _: OkResult = try await API.post(
+                "/api/today/swap",
+                body: SwapBody(programId: pid, dayIndex: day, slotIndex: slot, newExercise: newExercise)
+            )
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func logSet(slot: Int, exercise: String, weight: Double?, reps: Int?) async -> Bool {
@@ -89,13 +137,22 @@ final class TodayModel {
     func finish() async {
         guard let plan, let pid = plan.programId, let day = plan.dayIndex else { return }
         do {
-            let _: OkResult = try await API.post(
+            let result: FinishResult = try await API.post(
                 "/api/today/finish", body: FinishBody(programId: pid, dayIndex: day, sessionRpe: nil)
             )
+            debrief = result.debrief
             finished = true
         } catch {
+            // Older servers may return only {ok:true}
+            finished = true
             self.error = error.localizedDescription
         }
+    }
+
+    func shareSession() {
+        guard let plan else { return }
+        shareText = ShareText.session(plan: plan, debrief: debrief)
+        showShare = true
     }
 }
 
@@ -123,6 +180,9 @@ struct TodayView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { micButton }
             }
+            .sheet(isPresented: $model.showShare) {
+                ShareSheet(items: [model.shareText])
+            }
         }
         .task { await model.load() }
     }
@@ -135,13 +195,28 @@ struct TodayView: View {
         } else if let plan = model.plan, plan.active, let exercises = plan.exercises {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if plan.adaptation?.needsCheckin == true {
+                        checkinCard
+                    }
+                    if let catchUp = plan.catchUp {
+                        catchUpCard(catchUp)
+                    }
                     if let r = model.readiness, r.readinessScore != nil || r.hrvMs != nil {
                         ReadinessBanner(readiness: r, syncing: model.syncing) {
                             Task { await model.syncHealth() }
                         }
                     }
+                    if let adapt = plan.adaptation, adapt.needsCheckin != true {
+                        adaptationBanner(adapt)
+                    }
                     if let focus = plan.focus {
                         Text(focus).font(.subheadline).foregroundStyle(Color.mut)
+                    }
+                    if let mode = plan.goalMode {
+                        Text("\(mode) mode")
+                            .font(.caption.bold())
+                            .foregroundStyle(Color.brand)
+                            .textCase(.uppercase)
                     }
                     if !model.lastHeard.isEmpty {
                         Text(model.lastHeard).font(.caption).foregroundStyle(Color.mut)
@@ -171,6 +246,85 @@ struct TodayView: View {
         }
     }
 
+    private var checkinCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Check-in").font(.caption.bold()).foregroundStyle(Color.brand).textCase(.uppercase)
+            Text("Quick readiness before you train — Coach K adapts the day.")
+                .font(.caption).foregroundStyle(Color.mut)
+            HStack(spacing: 8) {
+                field("Sleep (h)", $model.checkinSleep)
+                field("Soreness", $model.checkinSoreness)
+                field("Stress", $model.checkinStress)
+            }
+            Button {
+                Task { await model.submitCheckin() }
+            } label: {
+                Text("Set today's plan")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.brand, in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(14)
+        .background(Color.panel, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brand.opacity(0.4), lineWidth: 1))
+    }
+
+    private func field(_ label: String, _ value: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.system(size: 9)).foregroundStyle(Color.mut)
+            TextField("", text: value)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.center)
+                .padding(8)
+                .background(Color.ink, in: RoundedRectangle(cornerRadius: 8))
+                .foregroundStyle(.white)
+        }
+    }
+
+    private func catchUpCard(_ info: CatchUpInfo) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(info.message).font(.subheadline).foregroundStyle(.white)
+            HStack(spacing: 8) {
+                ForEach([("resume", "Resume"), ("repeat_last", "Repeat"), ("light_makeup", "Light")], id: \.0) { id, label in
+                    Button(label) {
+                        Task { await model.catchUp(id) }
+                    }
+                    .font(.caption.bold())
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .background(Color.ink, in: Capsule())
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.panel, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func adaptationBanner(_ adapt: TodayAdaptation) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Readiness: \(adapt.status)\(adapt.score.map { " · \($0)" } ?? "")\(adapt.softDay ? " · soft day" : "")")
+                .font(.subheadline.bold())
+                .foregroundStyle(.white)
+            Text(adapt.intensityNote).font(.caption).foregroundStyle(Color.mut)
+            if let reason = adapt.reasons.first {
+                Text(reason).font(.caption2).foregroundStyle(Color.mut.opacity(0.8))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            adapt.softDay ? Color.orange.opacity(0.12) : Color.panel,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(adapt.softDay ? Color.orange.opacity(0.4) : Color.line, lineWidth: 1)
+        )
+    }
+
     private var micButton: some View {
         Button {
             if model.voice.isListening {
@@ -191,15 +345,32 @@ struct TodayView: View {
 
     private var finishedState: some View {
         VStack(spacing: 12) {
-            Text("✅").font(.system(size: 44))
-            Text("Day complete — nice work.").font(.headline).foregroundStyle(.white)
+            Text(model.debrief?.headline ?? "Day complete — nice work.")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            if let msg = model.debrief?.message {
+                Text(msg.replacingOccurrences(of: "**", with: ""))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.mut)
+                    .multilineTextAlignment(.leading)
+            }
+            Button("Share session") {
+                model.shareSession()
+            }
+            .font(.subheadline.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(Color.brand, in: Capsule())
             Button("See what's next →") {
                 model.finished = false
+                model.debrief = nil
                 model.loading = true
                 Task { await model.load() }
             }
             .foregroundStyle(Color.brand)
         }
+        .padding()
     }
 
     private var emptyState: some View {
@@ -311,14 +482,27 @@ struct ExerciseCard: View {
                                 .foregroundStyle(.white)
                         }
                         Text(ex.exercise).font(.headline).foregroundStyle(.white)
+                        if ex.swapped == true {
+                            Text("swap").font(.system(size: 9)).foregroundStyle(Color.brand)
+                        }
+                        if ex.adapted == true {
+                            Text("adapted").font(.system(size: 9)).foregroundStyle(.orange)
+                        }
                         if ex.loggedSets.contains(where: \.isPr) {
-                            Text("🎉").font(.caption)
+                            Text("PR").font(.caption.bold()).foregroundStyle(Color.brand)
                         }
                     }
                     Text("\(ex.sets) × \(ex.reps) · \(ex.intensity)")
                         .font(.caption).foregroundStyle(Color.mut)
-                    if let notes = ex.notes {
-                        Text(notes).font(.caption2).foregroundStyle(Color.mut).lineLimit(2)
+                    if let cue = ex.formCue {
+                        Text(cue).font(.caption2).foregroundStyle(Color.mut).lineLimit(3)
+                    }
+                    if let swap = ex.swapSuggestion {
+                        Button("Swap → \(swap)") {
+                            Task { await model.swap(slot: slot, to: swap) }
+                        }
+                        .font(.caption.bold())
+                        .foregroundStyle(Color.brand)
                     }
                 }
                 Spacer()
