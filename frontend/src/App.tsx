@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
 import Calendar from "./Calendar";
+import Landing from "./Landing";
 import OfflineBanner from "./OfflineBanner";
 import Onboarding from "./Onboarding";
 import Progress from "./Progress";
@@ -23,7 +24,13 @@ function md(text: string) {
   return { __html: html };
 }
 
-function LockScreen({ onUnlock }: { onUnlock: () => void }) {
+function LockScreen({
+  onUnlock,
+  onBack,
+}: {
+  onUnlock: () => void;
+  onBack?: () => void;
+}) {
   const [pw, setPw] = useState("");
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
@@ -61,6 +68,15 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             autoFocus
             className="ck-field"
           />
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mt-3 w-full py-2 text-xs font-semibold text-mut hover:text-white"
+            >
+              ← Back to landing
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -221,6 +237,8 @@ export default function App() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [dash, setDash] = useState<Dashboard | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [showLanding, setShowLanding] = useState(false);
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -235,8 +253,14 @@ export default function App() {
   const refreshDash = () =>
     api("/api/dashboard")
       .then((r) => {
-        if (r.status === 401) setLocked(true);
-        else return r.json().then((d: Dashboard) => {
+        if (r.status === 401) {
+          if (!localStorage.getItem("coachk_key")) setShowLanding(true);
+          else setLocked(true);
+          return;
+        }
+        setLocked(false);
+        setShowLanding(false);
+        return r.json().then((d: Dashboard) => {
           setDash(d);
           const profile = (d.profile || {}) as Record<string, unknown>;
           const localDone = localStorage.getItem("coachk_onboarded") === "1";
@@ -270,9 +294,38 @@ export default function App() {
     setView("chat");
   }
 
-  useEffect(() => {
+  function enterApp() {
+    setShowLanding(false);
+    setLocked(false);
+    setBooting(false);
     refreshDash();
     loadChats();
+  }
+
+  useEffect(() => {
+    // Probe without flashing the app shell: open access → app; 401 + no key → landing.
+    api("/api/dashboard")
+      .then(async (r) => {
+        if (r.ok) {
+          const d: Dashboard = await r.json();
+          setDash(d);
+          setShowLanding(false);
+          setLocked(false);
+          const profile = (d.profile || {}) as Record<string, unknown>;
+          const localDone = localStorage.getItem("coachk_onboarded") === "1";
+          if (!profile.onboarded && !localDone) setShowOnboarding(true);
+          loadChats();
+        } else if (r.status === 401) {
+          if (localStorage.getItem("coachk_key")) setLocked(true);
+          else setShowLanding(true);
+        } else if (!localStorage.getItem("coachk_key")) {
+          setShowLanding(true);
+        }
+      })
+      .catch(() => {
+        if (!localStorage.getItem("coachk_key")) setShowLanding(true);
+      })
+      .finally(() => setBooting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
@@ -350,13 +403,22 @@ export default function App() {
     }
   }
 
+  if (booting) {
+    return <div className="h-full bg-ink" />;
+  }
+
+  if (showLanding) {
+    return <Landing onUnlocked={enterApp} />;
+  }
+
   if (locked) {
     return (
       <LockScreen
-        onUnlock={() => {
+        onUnlock={enterApp}
+        onBack={() => {
+          localStorage.removeItem("coachk_key");
           setLocked(false);
-          refreshDash();
-          loadChats();
+          setShowLanding(true);
         }}
       />
     );
