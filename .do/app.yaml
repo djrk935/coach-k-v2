@@ -44,5 +44,6 @@ databases:
   - name: db
     engine: PG
     version: "16"
-    production: true
-    cluster_name: coach-k-db
+    # Dev database — cheapest managed-Postgres tier, plenty for a single athlete.
+    # Supports pgvector; the app runs CREATE EXTENSION IF NOT EXISTS vector on boot.
+    production: false
