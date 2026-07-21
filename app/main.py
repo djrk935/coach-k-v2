@@ -549,6 +549,14 @@ async def dashboard():
     }
 
 
+@app.get("/api/progress")
+async def progress(days: int = 90):
+    """Athlete progress series for the Progress dashboard."""
+    days = max(14, min(days, 365))
+    user_id = await tools.get_or_create_user()
+    return await tools.get_progress(user_id, days=days)
+
+
 @app.get("/api/warmup")
 async def warmup_preview(weight_lbs: float, exercise: str = "", set_type: str = "straight"):
     """Preview a warm-up ramp for a working weight (used when the athlete edits load)."""
@@ -560,6 +568,49 @@ async def warmup_preview(weight_lbs: float, exercise: str = "", set_type: str = 
         "working_lbs": weight_lbs,
         "warmup_sets": warmup_ramp(weight_lbs, exercise=exercise, set_type=set_type),
     }
+
+
+@app.get("/api/calendar")
+async def calendar(weeks: int = 2):
+    weeks = max(1, min(weeks, 4))
+    user_id = await tools.get_or_create_user()
+    return await tools.get_calendar(user_id, weeks=weeks)
+
+
+class CalendarMarkerIn(BaseModel):
+    date: str  # YYYY-MM-DD
+    kind: str | None = None  # rest | travel | game | null to clear
+    note: str | None = None
+
+
+@app.post("/api/calendar/marker")
+async def calendar_marker(body: CalendarMarkerIn):
+    from datetime import date as date_cls
+
+    user_id = await tools.get_or_create_user()
+    try:
+        d = date_cls.fromisoformat(body.date)
+    except ValueError as e:
+        raise HTTPException(400, "date must be YYYY-MM-DD") from e
+    try:
+        return await tools.upsert_calendar_marker(user_id, d, body.kind, body.note)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+class JumpDayIn(BaseModel):
+    program_id: str
+    day_index: int
+
+
+@app.post("/api/calendar/jump")
+async def calendar_jump(body: JumpDayIn):
+    """Set the active rotation index (e.g. jump to a specific program day)."""
+    user_id = await tools.get_or_create_user()
+    try:
+        return await tools.set_program_day_index(user_id, body.program_id, body.day_index)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 # Production: serve the built frontend from the same process (no Vite proxy).

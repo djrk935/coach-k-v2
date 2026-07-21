@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
+import Calendar from "./Calendar";
 import Onboarding from "./Onboarding";
 import Progress from "./Progress";
 import Settings from "./Settings";
@@ -222,7 +223,7 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  const [view, setView] = useState<"today" | "chat" | "templates" | "progress" | "about">("today");
+  const [view, setView] = useState<"today" | "chat" | "templates" | "progress" | "calendar" | "about">("today");
   const [showSettings, setShowSettings] = useState(false);
   const [showDash, setShowDash] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -414,7 +415,8 @@ export default function App() {
               ["today", "today"],
               ["chat", "chat"],
               ["templates", "plans"],
-              ["progress", "progress"],
+              ["progress", "stats"],
+              ["calendar", "week"],
               ["about", "about"],
             ] as const).map(([v, label]) => (
               <button
@@ -462,6 +464,8 @@ export default function App() {
           />
         ) : view === "progress" ? (
           <Progress />
+        ) : view === "calendar" ? (
+          <Calendar onOpenToday={() => setView("today")} />
         ) : view === "about" ? (
           <About
             onTalk={() => {

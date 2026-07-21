@@ -1019,6 +1019,224 @@ async def get_progress(user_id: str, days: int = 90) -> dict:
     }
 
 
+# ===== Mesocycle calendar =====
+
+_SCHEDULE_WEEKDAYS = {
+    2: (1, 4),          # Tue, Fri
+    3: (0, 2, 4),       # Mon, Wed, Fri
+    4: (0, 1, 3, 4),    # Mon, Tue, Thu, Fri
+    5: (0, 1, 2, 3, 4), # Mon–Fri
+    6: (0, 1, 2, 3, 4, 5),
+}
+
+
+def _days_per_week_from_profile(profile: dict, n_program_days: int) -> int:
+    sched = str(profile.get("schedule") or "").lower()
+    for n in (6, 5, 4, 3, 2):
+        if f"{n}" in sched:
+            return n
+    return min(max(n_program_days, 3), 6)
+
+
+def _monday_of(d: date) -> date:
+    return d - __import__("datetime").timedelta(days=d.weekday())
+
+
+async def get_calendar_markers(user_id: str, start: date, end: date) -> dict[str, dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT for_date, kind, note FROM calendar_markers
+               WHERE user_id = $1 AND for_date BETWEEN $2 AND $3""",
+            user_id, start, end,
+        )
+    return {
+        str(r["for_date"]): {"kind": r["kind"], "note": r["note"]}
+        for r in rows
+    }
+
+
+async def upsert_calendar_marker(
+    user_id: str, for_date: date, kind: str | None, note: str | None = None,
+) -> dict:
+    """Set kind to rest|travel|game, or None to clear."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if not kind:
+            await conn.execute(
+                "DELETE FROM calendar_markers WHERE user_id = $1 AND for_date = $2",
+                user_id, for_date,
+            )
+            return {"ok": True, "date": str(for_date), "kind": None}
+        if kind not in ("rest", "travel", "game"):
+            raise ValueError("kind must be rest|travel|game")
+        await conn.execute(
+            """INSERT INTO calendar_markers (user_id, for_date, kind, note)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (user_id, for_date)
+               DO UPDATE SET kind = EXCLUDED.kind, note = EXCLUDED.note""",
+            user_id, for_date, kind, note,
+        )
+    return {"ok": True, "date": str(for_date), "kind": kind, "note": note}
+
+
+async def get_calendar(user_id: str, weeks: int = 2) -> dict:
+    """Build a mesocycle week view: training days from the active rotation,
+    plus rest/travel/game markers and completed sessions."""
+    from datetime import timedelta
+
+    weeks = max(1, min(weeks, 4))
+    today = date.today()
+    start = _monday_of(today)
+    end = start + timedelta(days=weeks * 7 - 1)
+
+    prog = await get_active_program(user_id)
+    profile = await get_latest_profile(user_id)
+    markers = await get_calendar_markers(user_id, start, end)
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        done_rows = await conn.fetch(
+            """SELECT performed_at::date AS day, program_day_index, completed_at IS NOT NULL AS done
+               FROM workouts
+               WHERE user_id = $1 AND performed_at::date BETWEEN $2 AND $3""",
+            user_id, start, end,
+        )
+    completed_by_day = {str(r["day"]): dict(r) for r in done_rows}
+
+    days_out: list[dict] = []
+    if not prog:
+        cur = start
+        while cur <= end:
+            key = str(cur)
+            mark = markers.get(key)
+            days_out.append({
+                "date": key,
+                "weekday": cur.strftime("%a"),
+                "is_today": cur == today,
+                "kind": mark["kind"] if mark else "empty",
+                "note": (mark or {}).get("note"),
+                "training": None,
+                "completed": bool(completed_by_day.get(key)),
+            })
+            cur += timedelta(days=1)
+        return {
+            "start": str(start),
+            "end": str(end),
+            "weeks": weeks,
+            "program": None,
+            "days": days_out,
+        }
+
+    split = prog["plan"].get("weekly_split") or []
+    n = len(split) or 1
+    progress = await get_or_init_progress(user_id, prog["id"])
+    dpw = _days_per_week_from_profile(profile, n)
+    train_weekdays = _SCHEDULE_WEEKDAYS.get(dpw, _SCHEDULE_WEEKDAYS[3])
+
+    # Walk forward from today: assign upcoming training slots to rotation
+    # starting at current day_index (if today not yet completed).
+    rot_i = progress["day_index"] % n
+    today_done = bool(completed_by_day.get(str(today), {}).get("done"))
+    if today_done:
+        rot_i = (rot_i) % n  # finish_today already advanced day_index
+        # progress.day_index is already next; use it
+        rot_i = progress["day_index"] % n
+
+    future_map: dict[str, dict] = {}
+    walk = today
+    guard = 0
+    while walk <= end and guard < 60:
+        key = str(walk)
+        mark = markers.get(key)
+        if mark and mark["kind"] in ("rest", "travel", "game"):
+            walk += timedelta(days=1)
+            guard += 1
+            continue
+        if walk.weekday() in train_weekdays:
+            day = split[rot_i % n]
+            future_map[key] = {
+                "program_day_index": rot_i % n,
+                "day_label": day.get("day_label"),
+                "focus": day.get("focus"),
+                "exercises": len(day.get("exercises") or []),
+            }
+            rot_i += 1
+        walk += timedelta(days=1)
+        guard += 1
+
+    # Past training: if completed with program_day_index, label it
+    cur = start
+    while cur <= end:
+        key = str(cur)
+        mark = markers.get(key)
+        training = None
+        kind = "empty"
+        if mark:
+            kind = mark["kind"]
+        elif key in future_map:
+            training = future_map[key]
+            kind = "training"
+        elif cur < today and key in completed_by_day:
+            idx = completed_by_day[key].get("program_day_index")
+            if idx is not None and 0 <= idx < n:
+                day = split[idx]
+                training = {
+                    "program_day_index": idx,
+                    "day_label": day.get("day_label"),
+                    "focus": day.get("focus"),
+                    "exercises": len(day.get("exercises") or []),
+                }
+                kind = "training"
+            else:
+                kind = "completed"
+        elif cur < today and cur.weekday() in train_weekdays and not mark:
+            kind = "missed"
+
+        days_out.append({
+            "date": key,
+            "weekday": cur.strftime("%a"),
+            "is_today": cur == today,
+            "kind": kind,
+            "note": (mark or {}).get("note"),
+            "training": training,
+            "completed": bool(completed_by_day.get(key)),
+        })
+        cur += timedelta(days=1)
+
+    return {
+        "start": str(start),
+        "end": str(end),
+        "weeks": weeks,
+        "program": {
+            "id": prog["id"],
+            "name": prog["plan"].get("program_name"),
+            "goal": prog["plan"].get("goal"),
+            "days_in_rotation": n,
+            "day_index": progress["day_index"],
+            "cycle_count": progress["cycle_count"],
+            "days_per_week": dpw,
+        },
+        "days": days_out,
+    }
+
+
+async def set_program_day_index(user_id: str, program_id: str, day_index: int) -> dict:
+    prog = await get_active_program(user_id)
+    if not prog or prog["id"] != program_id:
+        raise ValueError("program not active")
+    n = len(prog["plan"].get("weekly_split") or []) or 1
+    day_index = int(day_index) % n
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """UPDATE program_progress SET day_index = $3, updated_at = now()
+               WHERE user_id = $1 AND program_id = $2""",
+            user_id, program_id, day_index,
+        )
+    return {"ok": True, "day_index": day_index}
+
+
 # ===== Context assembly =====
 
 def format_context(
