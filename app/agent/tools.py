@@ -907,6 +907,38 @@ async def remove_push_subscription(endpoint: str) -> None:
         await conn.execute("DELETE FROM push_subscriptions WHERE endpoint = $1", endpoint)
 
 
+async def save_apns_device(user_id: str, device_token: str, sandbox: bool = True) -> None:
+    token = device_token.strip().lower().replace(" ", "")
+    if not token:
+        raise ValueError("device_token required")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO apns_devices (user_id, device_token, sandbox, updated_at)
+               VALUES ($1, $2, $3, now())
+               ON CONFLICT (user_id, device_token)
+               DO UPDATE SET sandbox = EXCLUDED.sandbox, updated_at = now()""",
+            user_id, token, sandbox,
+        )
+
+
+async def list_apns_devices(user_id: str) -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT device_token, sandbox FROM apns_devices WHERE user_id = $1",
+            user_id,
+        )
+    return [{"device_token": r["device_token"], "sandbox": r["sandbox"]} for r in rows]
+
+
+async def remove_apns_device(device_token: str) -> None:
+    token = device_token.strip().lower().replace(" ", "")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM apns_devices WHERE device_token = $1", token)
+
+
 # ===== Progress dashboard =====
 
 _CANONICAL_LIFTS = [

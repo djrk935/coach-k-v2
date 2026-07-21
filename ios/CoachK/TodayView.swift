@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -154,6 +155,50 @@ final class TodayModel {
         shareText = ShareText.session(plan: plan, debrief: debrief)
         showShare = true
     }
+
+    func logPain(region: String) async {
+        do {
+            let _: OkResult = try await API.post(
+                "/api/today/pain",
+                body: PainBody(region: region, severity: 5, context: nil)
+            )
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func applyProtocol(regionKey: String) async {
+        guard let plan, let pid = plan.programId, let day = plan.dayIndex else { return }
+        do {
+            let _: OkResult = try await API.post(
+                "/api/today/apply-protocol-swaps",
+                body: ApplyProtocolBody(programId: pid, dayIndex: day, regionKey: regionKey)
+            )
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func formCheck(exercise: String, formCue: String?, videoURL: URL) async -> FormCheckAssessment? {
+        do {
+            let frames = try await FormCheckFrames.extract(from: videoURL)
+            let result: FormCheckResult = try await API.post(
+                "/api/form-check",
+                body: FormCheckBody(
+                    exercise: exercise,
+                    images: frames,
+                    note: nil,
+                    formCue: formCue
+                )
+            )
+            return result.assessment
+        } catch {
+            self.error = error.localizedDescription
+            return nil
+        }
+    }
 }
 
 enum Haptics {
@@ -208,6 +253,16 @@ struct TodayView: View {
                     }
                     if let adapt = plan.adaptation, adapt.needsCheckin != true {
                         adaptationBanner(adapt)
+                    }
+                    if let protocols = plan.injuryProtocols, !protocols.isEmpty {
+                        ForEach(protocols) { p in
+                            InjuryProtocolCard(item: p) {
+                                Task { await model.applyProtocol(regionKey: p.regionKey) }
+                            }
+                        }
+                    }
+                    PainReportRow(options: plan.painRegionOptions ?? []) { key in
+                        Task { await model.logPain(region: key) }
                     }
                     if let focus = plan.focus {
                         Text(focus).font(.subheadline).foregroundStyle(Color.mut)
@@ -456,6 +511,10 @@ struct ExerciseCard: View {
     @State private var weight: String
     @State private var reps: String
     @State private var busy = false
+    @State private var showPicker = false
+    @State private var formBusy = false
+    @State private var formError: String?
+    @State private var formResult: FormCheckAssessment?
 
     init(ex: TodayExercise, slot: Int, model: TodayModel) {
         self.ex = ex
@@ -557,9 +616,197 @@ struct ExerciseCard: View {
                 }
                 .disabled(busy || complete)
             }
+
+            Button {
+                showPicker = true
+            } label: {
+                Text(formBusy ? "Reading your set…" : "Check form (video)")
+                    .font(.caption.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.ink, in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(.white)
+            }
+            .disabled(formBusy)
+            .fileImporter(
+                isPresented: $showPicker,
+                allowedContentTypes: [.movie],
+                allowsMultipleSelection: false
+            ) { result in
+                guard case let .success(urls) = result, let url = urls.first else { return }
+                formBusy = true
+                formError = nil
+                formResult = nil
+                Task {
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if access { url.stopAccessingSecurityScopedResource() }
+                        formBusy = false
+                    }
+                    formResult = await model.formCheck(
+                        exercise: ex.exercise, formCue: ex.formCue, videoURL: url
+                    )
+                    if formResult == nil, let err = model.error {
+                        formError = err
+                    }
+                }
+            }
+
+            if let formError {
+                Text(formError).font(.caption2).foregroundStyle(.orange)
+            }
+            if let formResult {
+                FormCheckResultView(assessment: formResult)
+            }
         }
         .padding(12)
         .background(Color.panel, in: RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+struct InjuryProtocolCard: View {
+    let item: InjuryProtocol
+    let onApply: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Injury protocol")
+                .font(.caption.bold())
+                .foregroundStyle(Color.brand)
+                .textCase(.uppercase)
+            Text(item.region).font(.headline).foregroundStyle(.white)
+            if let hint = item.volumeHint {
+                Text(hint).font(.caption).foregroundStyle(Color.mut)
+            }
+            ForEach(item.steps, id: \.self) { step in
+                HStack(alignment: .top, spacing: 6) {
+                    Circle().fill(Color.orange).frame(width: 4, height: 4).padding(.top, 6)
+                    Text(step).font(.caption).foregroundStyle(Color.mut)
+                }
+            }
+            if !item.alternatives.isEmpty {
+                Text("Prefer today")
+                    .font(.caption2.bold())
+                    .foregroundStyle(Color.mut)
+                    .textCase(.uppercase)
+                Text(item.alternatives.joined(separator: " · "))
+                    .font(.caption2)
+                    .foregroundStyle(.white)
+            }
+            Button("Apply suggested swaps", action: onApply)
+                .font(.caption.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.ink, in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(.white)
+        }
+        .padding(14)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange.opacity(0.35), lineWidth: 1))
+    }
+}
+
+struct PainReportRow: View {
+    let options: [PainRegionOption]
+    let onPick: (String) -> Void
+    @State private var open = false
+
+    var body: some View {
+        if options.isEmpty {
+            EmptyView()
+        } else if !open {
+            Button("Something hurts? Flag a region") { open = true }
+                .font(.caption.bold())
+                .foregroundStyle(Color.mut)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Where's the pain?").font(.caption.bold()).foregroundStyle(.white)
+                    Spacer()
+                    Button("Cancel") { open = false }.font(.caption).foregroundStyle(Color.mut)
+                }
+                FlowChips(options: options, onPick: onPick)
+                Text("Sharp joint pain = stop. This opens a protocol and suggests swaps.")
+                    .font(.caption2)
+                    .foregroundStyle(Color.mut)
+            }
+            .padding(12)
+            .background(Color.panel, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+}
+
+struct FlowChips: View {
+    let options: [PainRegionOption]
+    let onPick: (String) -> Void
+
+    var body: some View {
+        FlexibleChips(options: options, onPick: onPick)
+    }
+}
+
+/// Simple wrapping chip row without a third-party layout package.
+struct FlexibleChips: View {
+    let options: [PainRegionOption]
+    let onPick: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(chunked(options, size: 4), id: \.first?.key) { row in
+                HStack(spacing: 6) {
+                    ForEach(row, id: \.key) { o in
+                        Button(o.label) { onPick(o.key) }
+                            .font(.caption.bold())
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Color.ink, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+        }
+    }
+
+    private func chunked(_ items: [PainRegionOption], size: Int) -> [[PainRegionOption]] {
+        stride(from: 0, to: items.count, by: size).map {
+            Array(items[$0..<min($0 + size, items.count)])
+        }
+    }
+}
+
+struct FormCheckResultView: View {
+    let assessment: FormCheckAssessment
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Form check").font(.caption.bold()).foregroundStyle(Color.brand).textCase(.uppercase)
+            Text(assessment.summary).font(.caption).foregroundStyle(.white)
+            if !assessment.lookingGood.isEmpty {
+                Text("Looking good").font(.caption2.bold()).foregroundStyle(.green).textCase(.uppercase)
+                ForEach(assessment.lookingGood, id: \.self) { g in
+                    Text("· \(g)").font(.caption2).foregroundStyle(Color.mut)
+                }
+            }
+            if !assessment.cues.isEmpty {
+                Text("Next-set cues").font(.caption2.bold()).foregroundStyle(Color.brand).textCase(.uppercase)
+                ForEach(assessment.cues, id: \.self) { c in
+                    Text("· \(c)").font(.caption2).foregroundStyle(Color.mut)
+                }
+            }
+            if !assessment.safetyFlags.isEmpty {
+                Text("Watch").font(.caption2.bold()).foregroundStyle(.orange).textCase(.uppercase)
+                ForEach(assessment.safetyFlags, id: \.self) { f in
+                    Text("· \(f)").font(.caption2).foregroundStyle(.orange)
+                }
+            }
+            if assessment.unclear {
+                Text("Film was unclear — try a side angle with the full bar path in frame.")
+                    .font(.caption2)
+                    .foregroundStyle(Color.mut)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.ink, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

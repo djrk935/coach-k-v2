@@ -25,6 +25,9 @@ dependencies = [
     # Proactive coaching (Tier 1: living plan + push)
     "pywebpush>=2.0",
     "apscheduler>=3.10",
+    # iOS APNs (optional — only used when APNS_* env is set)
+    "PyJWT[crypto]>=2.8",
+    "httpx[http2]>=0.27",
 ]
 
 [tool.uv]
@@ -33,6 +36,11 @@ dev-dependencies = [
     "pytest-asyncio>=0.24",
     "ruff>=0.7",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("healthConnected") private var healthConnected = false
     @State private var status = ""
     @State private var healthStatus = ""
+    @State private var pushStatus = ""
 
     var body: some View {
         NavigationStack {
@@ -37,7 +38,7 @@ struct SettingsView: View {
                         Text(status).font(.caption).foregroundStyle(Color.mut)
                     }
                 } footer: {
-                    Text("Production: use your App Platform HTTPS URL (https://….ondigitalocean.app) and the same APP_PASSWORD you set on the server.")
+                    Text("Production: use your App Platform HTTPS URL and the same APP_PASSWORD you set on the server.")
                 }
 
                 Section {
@@ -69,10 +70,18 @@ struct SettingsView: View {
                         .onChange(of: dailyReminder) { _, on in
                             Task { await Reminders.setDaily(enabled: on) }
                         }
+                    Button("Enable remote push (APNs)") {
+                        Task {
+                            pushStatus = await PushRegistration.requestAndRegister()
+                        }
+                    }
+                    if !pushStatus.isEmpty {
+                        Text(pushStatus).font(.caption).foregroundStyle(Color.mut)
+                    }
                 } header: {
                     Text("Coaching nudges")
                 } footer: {
-                    Text("A local reminder to log readiness and see today's session. No server required.")
+                    Text("Local morning reminder works offline. Remote push needs a paid Apple Developer account, Push capability in Xcode, and APNS_* keys on the server.")
                 }
 
                 Section("About") {

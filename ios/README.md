@@ -6,32 +6,28 @@ Native SwiftUI app (iOS 17+) over the same FastAPI backend.
 
 | Tab | Features |
 |-----|----------|
-| **Today** | Workout logging, voice log, HealthKit readiness, check-in gate, soft-day adaptation, catch-up, exercise swaps, form cues, session debrief + share |
+| **Today** | Logging, voice, HealthKit, check-in, adaptation, catch-up, swaps, injury protocols, video form check, debrief + share |
 | **Chat** | Streaming Coach K chat |
 | **Stats** | Progress (e1RM, ACWR, PRs) + share |
 | **Week** | Mesocycle calendar + rest/travel/game markers |
-| **Settings** | Server URL, app key, HealthKit, local morning reminder |
+| **Settings** | Server URL, app key, HealthKit, local reminder, APNs register |
 
 ## Working on it
 
 ```bash
-brew install xcodegen          # once
-cd ios
-xcodegen generate              # regenerates CoachK.xcodeproj from project.yml
-open CoachK.xcodeproj          # then ⌘R on a simulator
+brew install xcodegen
+cd ios && xcodegen generate && open CoachK.xcodeproj
 ```
 
-The project file is generated — edit `project.yml`, not the xcodeproj.
-Add new Swift files under `CoachK/` and rerun `xcodegen generate`.
+## Remote push (APNs)
+
+1. Paid Apple Developer team + Push Notifications capability in Xcode
+2. Create an APNs Auth Key (.p8) in the Apple developer portal
+3. Set on the server: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_AUTH_KEY` (PEM or path), `APNS_BUNDLE_ID=com.dayan.coachk`
+4. In the app: Settings → **Enable remote push (APNs)** (real device required for a token)
+
+Simulator can still use the local 8:00 reminder.
 
 ## Pointing at the backend
 
-Defaults to `http://localhost:8000` (simulator shares the Mac network). On a
-real device, set the server URL in Settings to your Mac's LAN IP or the
-deployed HTTPS URL, plus the app password if one is set.
-
-## Still web-first / next
-
-- Video form check, injury protocol cards, templates activate, PWA landing
-- APNs remote push (paid Apple Developer) — web Push already works
-- WidgetKit / Live Activity rest timer / Siri App Intents
+Defaults to `http://localhost:8000`. On a device, set your LAN IP or HTTPS App Platform URL + `APP_PASSWORD`.

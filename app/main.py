@@ -457,6 +457,32 @@ async def push_subscribe(body: PushSubscribeIn):
     return {"ok": True}
 
 
+class ApnsRegisterIn(BaseModel):
+    device_token: str
+    sandbox: bool | None = None
+
+
+@app.post("/api/push/apns/register")
+async def apns_register(body: ApnsRegisterIn):
+    """Register an iOS device token for remote coaching nudges."""
+    from app.apns import apns_configured
+    from app.config import settings as cfg
+
+    user_id = await tools.get_or_create_user()
+    sandbox = cfg.apns_sandbox if body.sandbox is None else body.sandbox
+    try:
+        await tools.save_apns_device(user_id, body.device_token, sandbox=sandbox)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "configured": apns_configured(), "sandbox": sandbox}
+
+
+@app.delete("/api/push/apns/register")
+async def apns_unregister(body: ApnsRegisterIn):
+    await tools.remove_apns_device(body.device_token)
+    return {"ok": True}
+
+
 # ===== Profile (settings page) =====
 
 class ProfilePatch(BaseModel):

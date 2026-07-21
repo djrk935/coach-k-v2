@@ -105,3 +105,6 @@ Simulator defaults to `http://localhost:8000` with `./run.sh` on your Mac.
   locally and `pg_dump`/`restore` to avoid re-parsing.
 - **Web push** (optional): generate VAPID keys (`python -m app.gen_vapid_keys`) and set
   `VAPID_*` env vars on the server.
+- **iOS APNs** (optional): set `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_AUTH_KEY` (.p8 PEM or
+  path), and `APNS_BUNDLE_ID`. Tokens register via Settings → Enable remote push.
+  Migration `008` creates `apns_devices` on startup.

@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     vapid_public_key: str | None = None
     vapid_private_key: str | None = None
     vapid_subject: str = "mailto:coach@coach-k.local"
+
+    # Apple Push Notification service (optional — iOS remote push)
+    apns_key_id: str | None = None
+    apns_team_id: str | None = None
+    # PEM contents or path to AuthKey_XXX.p8
+    apns_auth_key: str | None = None
+    apns_bundle_id: str = "com.dayan.coachk"
+    apns_sandbox: bool = True
+
     embed_model: str = "BAAI/bge-base-en-v1.5"  # local via fastembed — free, private
     embed_dim: int = 768
 

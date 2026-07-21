@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct CoachKApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var selectedTab = 0
 
     var body: some Scene {

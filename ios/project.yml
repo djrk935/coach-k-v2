@@ -19,14 +19,18 @@ targets:
       path: CoachK/CoachK.entitlements
       properties:
         com.apple.developer.healthkit: true
+        aps-environment: development
     info:
       path: CoachK/Info.plist
       properties:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes: [remote-notification]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSSpeechRecognitionUsageDescription: Coach K transcribes your voice to log sets hands-free.
         NSMicrophoneUsageDescription: Coach K listens so you can log sets by voice mid-workout.
+        NSCameraUsageDescription: Coach K uses the camera so you can film a set for form check.
+        NSPhotoLibraryUsageDescription: Coach K reads a short clip you pick so it can check your form.
         NSHealthShareUsageDescription: Coach K reads your sleep, HRV, and resting heart rate to gauge recovery and adjust your training.

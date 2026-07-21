@@ -75,6 +75,8 @@ struct TodayPlan: Codable {
     let catchUp: CatchUpInfo?
     let goalMode: String?
     let painRegions: [String]?
+    let injuryProtocols: [InjuryProtocol]?
+    let painRegionOptions: [PainRegionOption]?
 }
 
 struct LogSetBody: Codable {
@@ -138,6 +140,58 @@ struct SwapBody: Codable {
 struct CatchUpBody: Codable {
     let programId: String
     let action: String
+}
+
+struct InjuryProtocol: Codable, Identifiable, Hashable {
+    var id: String { regionKey }
+    let region: String
+    let regionKey: String
+    let steps: [String]
+    let alternatives: [String]
+    let volumeHint: String?
+}
+
+struct PainRegionOption: Codable, Hashable {
+    let key: String
+    let label: String
+}
+
+struct PainBody: Codable {
+    let region: String
+    let severity: Int
+    let context: String?
+}
+
+struct ApplyProtocolBody: Codable {
+    let programId: String
+    let dayIndex: Int
+    let regionKey: String?
+}
+
+struct FormCheckBody: Codable {
+    let exercise: String
+    let images: [String]
+    let note: String?
+    let formCue: String?
+}
+
+struct FormCheckAssessment: Codable, Hashable {
+    let summary: String
+    let lookingGood: [String]
+    let cues: [String]
+    let safetyFlags: [String]
+    let unclear: Bool
+}
+
+struct FormCheckResult: Codable {
+    let ok: Bool?
+    let exercise: String?
+    let assessment: FormCheckAssessment?
+}
+
+struct ApnsRegisterBody: Codable {
+    let deviceToken: String
+    let sandbox: Bool
 }
 
 struct ReadinessBody: Codable {
