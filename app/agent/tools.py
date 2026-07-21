@@ -264,18 +264,27 @@ async def get_load_summary(user_id: str) -> dict:
 
 async def save_program(user_id: str, plan: WorkoutPlan) -> str:
     pool = await get_pool()
-    # Pass JSON text with an explicit ::jsonb cast so Postgres stores an object,
-    # not a JSON string scalar (asyncpg would otherwise double-encode a str).
-    plan_json = json.dumps(plan.model_dump(mode="json"))
-    citations_json = json.dumps([c.model_dump(mode="json") for c in plan.citations])
+    # Pass native dict/list — asyncpg's jsonb codec encodes objects correctly.
+    # (Passing json.dumps(str) without care can store a JSON *string* scalar.)
+    plan_obj = plan.model_dump(mode="json")
+    citations_obj = [c.model_dump(mode="json") for c in plan.citations]
     async with pool.acquire() as conn:
         pid = await conn.fetchval(
             """INSERT INTO programs (user_id, name, goal, plan, citations)
                VALUES ($1, $2, $3, $4::jsonb, $5::jsonb) RETURNING id""",
             user_id, plan.program_name, plan.goal,
-            plan_json,
-            citations_json,
+            json.dumps(plan_obj),
+            json.dumps(citations_obj),
         )
+        # Verify we stored an object with a usable weekly_split (guards regressions)
+        kind = await conn.fetchval(
+            "SELECT jsonb_typeof(plan) FROM programs WHERE id = $1", pid
+        )
+        if kind == "string":
+            await conn.execute(
+                """UPDATE programs SET plan = (plan #>> '{}')::jsonb WHERE id = $1""",
+                pid,
+            )
     return str(pid)
 
 
@@ -424,10 +433,19 @@ def _suggest_weight(exercise: str, intensity: str, one_rms: dict, last_weight: f
 
     key = _lift_key_for(exercise)
     if key and key in one_rms:
+        try:
+            rm = float(one_rms[key])
+        except (TypeError, ValueError):
+            rm = None
         m = re.search(r"(\d+(?:\.\d+)?)\s*%", intensity or "")
-        if m:
-            return round(one_rms[key] * float(m.group(1)) / 100 / 5) * 5  # round to nearest 5 lbs
-    return last_weight
+        if rm and m:
+            return round(rm * float(m.group(1)) / 100 / 5) * 5  # round to nearest 5 lbs
+    if last_weight is None:
+        return None
+    try:
+        return float(last_weight)
+    except (TypeError, ValueError):
+        return None
 
 
 async def get_last_weight(user_id: str, exercise: str) -> float | None:
@@ -569,8 +587,17 @@ async def get_today(user_id: str) -> dict | None:
         return None
     progress = await get_or_init_progress(user_id, prog["id"])
     day = days[progress["day_index"] % len(days)]
+    if not isinstance(day, dict):
+        day = _as_dict(day)
     profile = await get_latest_profile(user_id)
-    one_rms = profile.get("lifts_1rm", {})
+    raw_rms = profile.get("lifts_1rm") or profile.get("one_rms") or {}
+    one_rms: dict[str, float] = {}
+    if isinstance(raw_rms, dict):
+        for k, v in raw_rms.items():
+            try:
+                one_rms[str(k)] = float(v)
+            except (TypeError, ValueError):
+                continue
     readiness = await get_recent_readiness(user_id, days=1)
     load = await get_load_summary(user_id)
     pain_regions = await active_pain_regions(user_id, profile)
@@ -612,23 +639,27 @@ async def get_today(user_id: str) -> dict | None:
 
     exercises = []
     for i, ex in enumerate(scaled):
-        last = await get_last_weight(user_id, ex["exercise"])
-        media = media_for(ex["exercise"])
+        name = ex.get("exercise") or ex.get("name")
+        if not name:
+            continue
+        ex = {**ex, "exercise": name}
+        last = await get_last_weight(user_id, name)
+        media = media_for(name)
         logged = logged_by_slot.get(i, [])
         prog_hint = progression_delta_lbs(
-            ex["exercise"], ex.get("intensity", ""), logged or [],
-            int(ex.get("sets") or 1), ex.get("reps", ""),
+            name, ex.get("intensity", ""), logged or [],
+            int(ex.get("sets") or 1), str(ex.get("reps") or ""),
         )
         # Also peek at last completed session for this exercise for next-session bump
         if not prog_hint and not logged:
             # Use historical last workout sets via last weight only; bump stored in notes if prior clear
             prog_hint = None
-        suggested = _suggest_weight(ex["exercise"], ex.get("intensity", ""), one_rms, last)
+        suggested = _suggest_weight(name, ex.get("intensity", ""), one_rms, last)
         suggested = apply_progression_to_suggestion(suggested, prog_hint)
-        swap = suggest_swap(ex["exercise"], pain_regions) if pain_regions else None
+        swap = suggest_swap(name, pain_regions) if pain_regions else None
         warmups = warmup_ramp(
             suggested,
-            exercise=ex["exercise"],
+            exercise=name,
             set_type=ex.get("set_type") or "straight",
         )
         exercises.append({
@@ -636,7 +667,7 @@ async def get_today(user_id: str) -> dict | None:
             "suggested_weight_lbs": suggested,
             "logged_sets": logged,
             "image_urls": media["image_urls"] if media else [],
-            "form_cue": form_cue_for(ex["exercise"]),
+            "form_cue": form_cue_for(name),
             "swap_suggestion": swap,
             "progression": prog_hint,
             "warmup_sets": warmups,
@@ -663,22 +694,26 @@ async def get_today(user_id: str) -> dict | None:
             ]
             exercises = []
             for i, ex in enumerate(apply_volume_scale(raw_exercises, adapt["volume_scale"])):
-                last = await get_last_weight(user_id, ex["exercise"])
-                media = media_for(ex["exercise"])
+                name = ex.get("exercise") or ex.get("name")
+                if not name:
+                    continue
+                ex = {**ex, "exercise": name}
+                last = await get_last_weight(user_id, name)
+                media = media_for(name)
                 suggested = _suggest_weight(
-                    ex["exercise"], ex.get("intensity", ""), one_rms, last
+                    name, ex.get("intensity", ""), one_rms, last
                 )
                 exercises.append({
                     **ex,
                     "suggested_weight_lbs": suggested,
                     "logged_sets": logged_by_slot.get(i, []),
                     "image_urls": media["image_urls"] if media else [],
-                    "form_cue": form_cue_for(ex["exercise"]),
-                    "swap_suggestion": suggest_swap(ex["exercise"], pain_regions) if pain_regions else None,
+                    "form_cue": form_cue_for(name),
+                    "swap_suggestion": suggest_swap(name, pain_regions) if pain_regions else None,
                     "progression": None,
                     "warmup_sets": warmup_ramp(
                         suggested,
-                        exercise=ex["exercise"],
+                        exercise=name,
                         set_type=ex.get("set_type") or "straight",
                     ),
                 })

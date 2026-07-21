@@ -514,6 +514,7 @@ function CheckinGate({
 export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void }) {
   const [plan, setPlan] = useState<TodayPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [finished, setFinished] = useState(false);
   const [debrief, setDebrief] = useState<TodayPlan["debrief"] | null>(null);
   const [listening, setListening] = useState(false);
@@ -525,12 +526,24 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
 
   const load = () =>
     api("/api/today")
-      .then((r) => (r.ok ? r.json() : { active: false }))
+      .then(async (r) => {
+        if (r.ok) {
+          setLoadError("");
+          return r.json();
+        }
+        const err = await r.json().catch(() => ({}));
+        const detail = typeof err.detail === "string" ? err.detail : `Couldn't load Today (${r.status})`;
+        setLoadError(detail);
+        return { active: false };
+      })
       .then((d) => {
         setPlan(d);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setLoadError("Couldn't reach the server.");
+        setLoading(false);
+      });
 
   useEffect(() => {
     load();
@@ -654,9 +667,13 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
         <div className="relative animate-rise text-left">
           <p className="font-display text-xs font-extrabold tracking-[0.32em] text-white">TODAY</p>
           <span className="mt-3 block h-0.5 w-16 bg-white" />
-          <p className="mt-4 font-display text-2xl font-black tracking-tight text-white">No active program yet.</p>
+          <p className="mt-4 font-display text-2xl font-black tracking-tight text-white">
+            {loadError ? "Couldn't load today's plan." : "No active program yet."}
+          </p>
           <p className="mt-2 max-w-sm text-sm text-white/85">
-            Pick a book-inspired plan or ask Coach K to build one around your goals.
+            {loadError
+              ? loadError
+              : "Pick a book-inspired plan or ask Coach K to build one around your goals."}
           </p>
           <button
             onClick={onGoToTemplates}
