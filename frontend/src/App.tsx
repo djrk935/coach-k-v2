@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
 import Calendar from "./Calendar";
+import DesignChooser from "./design/DesignChooser";
 import Landing from "./Landing";
 import OfflineBanner from "./OfflineBanner";
 import Onboarding from "./Onboarding";
@@ -9,6 +10,14 @@ import Progress from "./Progress";
 import Settings from "./Settings";
 import Templates from "./Templates";
 import Today from "./Today";
+
+function wantsDesignChooser(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get("design") === "1";
+  } catch {
+    return false;
+  }
+}
 
 // Minimal markdown: **bold** + [links](url); /api links get the auth key.
 function md(text: string) {
@@ -239,6 +248,7 @@ export default function App() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [booting, setBooting] = useState(true);
   const [showLanding, setShowLanding] = useState(false);
+  const [showDesign, setShowDesign] = useState(wantsDesignChooser);
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -403,12 +413,16 @@ export default function App() {
     }
   }
 
+  if (showDesign) {
+    return <DesignChooser />;
+  }
+
   if (booting) {
     return <div className="h-full bg-ink" />;
   }
 
   if (showLanding) {
-    return <Landing onUnlocked={enterApp} />;
+    return <Landing onUnlocked={enterApp} onOpenDesign={() => setShowDesign(true)} />;
   }
 
   if (locked) {

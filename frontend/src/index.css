@@ -159,3 +159,14 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .animate-rise, .animate-fade, .animate-pulse-ring, .ck-hero-pan { animation: none; }
 }
+
+/* Design-chooser light directions — kill global dark wash while previewing */
+html.design-day-court body,
+html.design-signal body {
+  background: #f3f1ec;
+  color: #111;
+}
+html.design-day-court body::before,
+html.design-signal body::before {
+  opacity: 0;
+}

@@ -12,8 +12,10 @@ const PORTRAIT = "/images/coach-dayan.jpg";
 
 export default function Landing({
   onUnlocked,
+  onOpenDesign,
 }: {
   onUnlocked: () => void;
+  onOpenDesign?: () => void;
 }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -142,6 +144,15 @@ export default function Landing({
       <footer className="border-t border-line/40 px-5 py-8 text-center pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <p className="ck-mark text-[11px]">COACH K</p>
         <p className="mt-2 text-[11px] text-mut">Dayan Kijege · Austin, TX</p>
+        {onOpenDesign && (
+          <button
+            type="button"
+            onClick={onOpenDesign}
+            className="mt-4 text-[11px] font-semibold text-mut underline-offset-2 hover:text-white hover:underline"
+          >
+            Preview UI directions
+          </button>
+        )}
       </footer>
     </div>
   );
