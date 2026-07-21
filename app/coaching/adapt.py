@@ -56,6 +56,7 @@ def adaptation_for(
     volume_scale = 1.0
     soft_day = False
     intensity_note = "Hit prescribed intensities; leave 1–2 RIR on accessories."
+    positive_reason = ""
 
     acwr = (load or {}).get("acwr")
     if isinstance(acwr, (int, float)) and acwr > 1.5:
@@ -77,20 +78,26 @@ def adaptation_for(
         reasons.append("Readiness moderate — keep primaries, shorten accessories.")
         intensity_note = "Hold loads; stop a rep earlier than usual on accessories."
     elif status == "primed":
-        reasons.append("Readiness primed — green light for planned intensities.")
+        positive_reason = "Readiness primed — green light for planned intensities."
         intensity_note = "Earn the top sets. Still leave 1 RIR on isolation work."
     elif status == "ready":
-        reasons.append("Readiness solid — run the plan as written.")
+        positive_reason = "Readiness solid — run the plan as written."
     elif score is None:
         reasons.append("No readiness logged yet — check in before you train.")
 
     if pain_regions:
         soft_day = True
         volume_scale = min(volume_scale, 0.7)
-        reasons.append(
-            "Active pain flagged (" + ", ".join(pain_regions) + ") — prefer swaps and lower load."
+        # Lead with the operative reason so copy never reads "primed" + "soft day".
+        reasons.insert(
+            0,
+            "Easing off for " + ", ".join(pain_regions) + " — lower load, prefer swaps.",
         )
-        intensity_note = "Pain regions: reduce load, use swaps, stop if sharp pain."
+        intensity_note = "Flagged pain: reduce load, use swaps, stop on sharp pain."
+
+    # Only show the green-light line when we're actually running the plan hot.
+    if positive_reason and not soft_day:
+        reasons.insert(0, positive_reason)
 
     return {
         "score": score,

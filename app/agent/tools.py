@@ -225,6 +225,37 @@ async def log_pain(user_id: str, region: str, severity: int, context: str | None
         )
 
 
+async def clear_pain(user_id: str, region: str | None = None) -> int:
+    """Clear recent pain flags so a stray tap doesn't force soft days forever.
+
+    Clears the last 14 days (the window Today reads). With `region`, only that
+    region (matched raw or normalized). Returns rows removed.
+    """
+    from app.coaching.swaps import normalize_region
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if region:
+            key = normalize_region(region)
+            status = await conn.execute(
+                """DELETE FROM pain_logs
+                   WHERE user_id = $1
+                     AND lower(region) IN (lower($2), lower($3))
+                     AND logged_at > now() - INTERVAL '14 days'""",
+                user_id, region, key or region,
+            )
+        else:
+            status = await conn.execute(
+                """DELETE FROM pain_logs
+                   WHERE user_id = $1 AND logged_at > now() - INTERVAL '14 days'""",
+                user_id,
+            )
+    try:
+        return int(status.split()[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
 async def get_load_summary(user_id: str) -> dict:
     """Session load = sRPE proxy (session_rpe × set count). ACWR = 7d avg / 28d avg."""
     pool = await get_pool()
@@ -427,8 +458,18 @@ def _lift_key_for(exercise: str) -> str | None:
     return None
 
 
+def _round_load(lbs: float) -> float:
+    """Round to a loadable weight: nearest 5 lb (2.5 under 100)."""
+    inc = 2.5 if lbs < 100 else 5.0
+    r = round(lbs / inc) * inc
+    return int(r) if r == int(r) else r
+
+
 def _suggest_weight(exercise: str, intensity: str, one_rms: dict, last_weight: float | None) -> float | None:
-    """Best-effort target load: %1RM off the profile, else last time's weight."""
+    """Best-effort target load: %1RM off the profile, else last time's weight.
+
+    Always returns a loadable weight (no odd fractions like 220.5 from
+    historical kg→lb conversions)."""
     import re
 
     key = _lift_key_for(exercise)
@@ -439,11 +480,11 @@ def _suggest_weight(exercise: str, intensity: str, one_rms: dict, last_weight: f
             rm = None
         m = re.search(r"(\d+(?:\.\d+)?)\s*%", intensity or "")
         if rm and m:
-            return round(rm * float(m.group(1)) / 100 / 5) * 5  # round to nearest 5 lbs
+            return _round_load(rm * float(m.group(1)) / 100)
     if last_weight is None:
         return None
     try:
-        return float(last_weight)
+        return _round_load(float(last_weight))
     except (TypeError, ValueError):
         return None
 

@@ -511,6 +511,16 @@ function CheckinGate({
   );
 }
 
+function isExerciseDone(ex: { logged_sets: unknown[]; sets: number }): boolean {
+  return ex.logged_sets.length >= ex.sets;
+}
+
+function nextUnfinished(exs: { logged_sets: unknown[]; sets: number }[], from: number): number | null {
+  for (let i = from + 1; i < exs.length; i++) if (!isExerciseDone(exs[i])) return i;
+  for (let i = 0; i <= from && i < exs.length; i++) if (!isExerciseDone(exs[i])) return i;
+  return null;
+}
+
 export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void }) {
   const [plan, setPlan] = useState<TodayPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -521,8 +531,27 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const [heard, setHeard] = useState("");
   const [restFor, setRestFor] = useState<number | null>(null);
   const [protocolBusy, setProtocolBusy] = useState(false);
+  const [painBusy, setPainBusy] = useState(false);
   const [shareMsg, setShareMsg] = useState("");
+  const [mode, setMode] = useState<"focus" | "list">(
+    () => (localStorage.getItem("coachk_today_mode") === "list" ? "list" : "focus"),
+  );
+  const [focusIndex, setFocusIndex] = useState(0);
+  const initedRef = useRef(false);
+  const advanceFromRef = useRef<number | null>(null);
+  const topRef = useRef<HTMLDivElement>(null);
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
+
+  function chooseMode(m: "focus" | "list") {
+    setMode(m);
+    localStorage.setItem("coachk_today_mode", m);
+  }
+
+  function focusScrollTop() {
+    requestAnimationFrame(() =>
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
 
   const load = () =>
     api("/api/today")
@@ -550,6 +579,45 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Focus mode: land on the first unfinished lift, and after logging the last
+  // set of the focused lift, auto-advance to the next unfinished one.
+  useEffect(() => {
+    if (!plan?.active) return;
+    const exs = plan.exercises;
+    if (!exs.length) return;
+    if (!initedRef.current) {
+      initedRef.current = true;
+      const first = exs.findIndex((e) => !isExerciseDone(e));
+      setFocusIndex(first >= 0 ? first : 0);
+      return;
+    }
+    if (focusIndex > exs.length - 1) {
+      setFocusIndex(Math.max(0, exs.length - 1));
+      return;
+    }
+    const justLogged = advanceFromRef.current;
+    advanceFromRef.current = null;
+    if (justLogged != null && justLogged === focusIndex && isExerciseDone(exs[focusIndex])) {
+      const nxt = nextUnfinished(exs, focusIndex);
+      if (nxt != null && nxt !== focusIndex) {
+        setFocusIndex(nxt);
+        focusScrollTop();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan]);
+
+  async function clearPain(region?: string) {
+    setPainBusy(true);
+    await api("/api/today/pain/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(region ? { region } : {}),
+    });
+    setPainBusy(false);
+    await load();
+  }
+
   async function logSet(
     slot: number, exercise: string, weight: number | null, reps: number | null, rir: number | null,
   ) {
@@ -566,6 +634,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
       const ex = plan.exercises[slot];
       const rest = typeof ex?.rest_s === "number" && ex.rest_s > 0 ? ex.rest_s : 90;
       setRestFor(rest);
+      advanceFromRef.current = slot;
       await load();
     }
   }
@@ -750,7 +819,12 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
     );
   }
 
-  const allDone = plan.exercises.every((ex) => ex.logged_sets.length >= ex.sets);
+  const total = plan.exercises.length;
+  const doneCount = plan.exercises.filter(isExerciseDone).length;
+  const allDone = total > 0 && doneCount === total;
+  const focused = total ? plan.exercises[Math.min(focusIndex, total - 1)] : null;
+  const nextIdx = focused ? nextUnfinished(plan.exercises, Math.min(focusIndex, total - 1)) : null;
+  const nextName = nextIdx != null && nextIdx !== focusIndex ? plan.exercises[nextIdx].exercise : "";
   const adapt = plan.adaptation;
   const needsCheckin = adapt?.needs_checkin;
 
@@ -805,18 +879,52 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
       </div>
 
       {adapt && !needsCheckin && (
-        <div className={`mb-4 border p-3 text-sm ${
-          adapt.soft_day ? "border-brand bg-brand/5" : "border-line bg-panel"
-        }`}>
-          <p className="font-semibold capitalize">
-            Readiness: {adapt.status}
-            {adapt.score != null ? ` · ${adapt.score}` : ""}
-            {adapt.soft_day ? " · soft day" : ""}
+        <div className="mb-4 border border-line bg-panel p-3 text-sm">
+          <p className="flex flex-wrap items-center gap-2 font-semibold capitalize">
+            <span>
+              Readiness: {adapt.status}
+              {adapt.score != null ? ` · ${adapt.score}` : ""}
+            </span>
+            {adapt.soft_day && (
+              <span className="rounded-none bg-brand px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                Easing off
+              </span>
+            )}
           </p>
           <p className="mt-1 text-xs text-mut">{adapt.intensity_note}</p>
           {adapt.reasons?.[0] && (
             <p className="mt-1 text-xs text-mut">{adapt.reasons[0]}</p>
           )}
+        </div>
+      )}
+
+      {/* Active pain flags — with a way to clear a stray tap (kills the phantom soft-day) */}
+      {(plan.pain_regions?.length ?? 0) > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-mut">
+            Flagged:
+          </span>
+          {plan.pain_regions!.map((r) => (
+            <button
+              key={r}
+              type="button"
+              disabled={painBusy}
+              onClick={() => clearPain(r)}
+              title={`Clear ${r}`}
+              className="group inline-flex items-center gap-1 border border-brand px-2 py-1 text-[11px] font-semibold text-brand hover:bg-brand hover:text-white disabled:opacity-50"
+            >
+              {r}
+              <span className="opacity-60 group-hover:opacity-100">✕</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={painBusy}
+            onClick={() => clearPain()}
+            className="text-[11px] font-semibold text-mut underline-offset-2 hover:text-brand hover:underline disabled:opacity-50"
+          >
+            Feeling good — clear all
+          </button>
         </div>
       )}
 
@@ -852,15 +960,110 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
 
       {heard && <p className="mb-3 text-xs text-mut">Heard: "{heard}"</p>}
 
-      <div>
-        {plan.exercises.map((ex, i) => (
-          <ExerciseCard key={`${ex.exercise}-${i}`} ex={ex} slot={i} onLog={logSet} onSwap={swap} />
-        ))}
+      <div ref={topRef} />
+
+      {/* Session progress + mode toggle */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
+          {doneCount} / {total} done
+        </p>
+        <div className="flex border border-line">
+          {(["focus", "list"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => chooseMode(m)}
+              data-active={mode === m}
+              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                mode === m ? "bg-brand text-white" : "text-mut hover:text-brand"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {mode === "focus" && focused ? (
+        <>
+          {/* Progress strip — tap any block to jump to that lift */}
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {plan.exercises.map((ex, i) => {
+              const done = isExerciseDone(ex);
+              const current = i === focusIndex;
+              return (
+                <button
+                  key={`${ex.exercise}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setFocusIndex(i);
+                    focusScrollTop();
+                  }}
+                  title={ex.exercise}
+                  aria-label={`${ex.exercise}${done ? " (done)" : ""}`}
+                  className={`h-2.5 flex-1 min-w-[1.5rem] transition ${
+                    done
+                      ? "bg-brand"
+                      : current
+                        ? "bg-transparent ring-2 ring-brand ring-inset"
+                        : "bg-line"
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
+            Exercise {focusIndex + 1} / {total}
+          </p>
+
+          <ExerciseCard
+            key={`${focused.exercise}-${focusIndex}`}
+            ex={focused}
+            slot={focusIndex}
+            onLog={logSet}
+            onSwap={swap}
+          />
+
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              disabled={focusIndex <= 0}
+              onClick={() => {
+                setFocusIndex((i) => Math.max(0, i - 1));
+                focusScrollTop();
+              }}
+              className="ck-btn ck-btn-ghost px-3 py-2 text-xs disabled:opacity-30"
+            >
+              ← Prev
+            </button>
+            <p className="min-w-0 flex-1 truncate text-center text-[11px] text-mut">
+              {nextName ? `Up next: ${nextName}` : allDone ? "All done — finish up" : "Last exercise"}
+            </p>
+            <button
+              type="button"
+              disabled={focusIndex >= total - 1}
+              onClick={() => {
+                setFocusIndex((i) => Math.min(total - 1, i + 1));
+                focusScrollTop();
+              }}
+              className="ck-btn ck-btn-ghost px-3 py-2 text-xs disabled:opacity-30"
+            >
+              Next →
+            </button>
+          </div>
+        </>
+      ) : (
+        <div>
+          {plan.exercises.map((ex, i) => (
+            <ExerciseCard key={`${ex.exercise}-${i}`} ex={ex} slot={i} onLog={logSet} onSwap={swap} />
+          ))}
+        </div>
+      )}
 
       <button
         onClick={finishWorkout}
-        className="ck-btn ck-btn-primary mt-5 w-full py-3"
+        className={`ck-btn mt-5 w-full py-3 ${allDone ? "ck-btn-primary" : "ck-btn-ghost"}`}
       >
         {allDone ? "Finish Workout" : "Finish Workout Anyway"}
       </button>

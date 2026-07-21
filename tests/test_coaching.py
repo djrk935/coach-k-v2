@@ -63,7 +63,11 @@ def test_adaptation_pain_forces_soft_day():
     )
     assert adapt["soft_day"] is True
     assert adapt["volume_scale"] <= 0.7
-    assert any("pain" in r.lower() for r in adapt["reasons"])
+    # Operative reason leads and names the region; intensity note covers pain guidance.
+    assert any("knee" in r.lower() for r in adapt["reasons"])
+    assert "pain" in adapt["intensity_note"].lower()
+    # No contradictory green-light line when we're easing off.
+    assert not any("green light" in r.lower() for r in adapt["reasons"])
 
 
 def test_adaptation_acwr_spike():

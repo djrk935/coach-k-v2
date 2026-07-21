@@ -364,6 +364,19 @@ async def today_pain(body: PainIn):
     }
 
 
+class ClearPainIn(BaseModel):
+    region: str | None = None
+
+
+@app.post("/api/today/pain/clear")
+async def today_pain_clear(body: ClearPainIn):
+    """Remove a mistaken/stale pain flag so Today stops easing off."""
+    user_id = await tools.get_or_create_user()
+    removed = await tools.clear_pain(user_id, body.region)
+    day = await tools.get_today(user_id)
+    return {"ok": True, "removed": removed, "today": day}
+
+
 class ApplyProtocolIn(BaseModel):
     program_id: str
     day_index: int
