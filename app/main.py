@@ -549,6 +549,14 @@ async def dashboard():
     }
 
 
+@app.get("/api/progress")
+async def progress(days: int = 90):
+    """Athlete progress series for the Progress dashboard."""
+    days = max(14, min(days, 365))
+    user_id = await tools.get_or_create_user()
+    return await tools.get_progress(user_id, days=days)
+
+
 # Production: serve the built frontend from the same process (no Vite proxy).
 # Mounted last so /api routes take precedence. Absent in local dev — harmless.
 _FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"

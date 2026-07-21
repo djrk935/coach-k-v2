@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
 import Onboarding from "./Onboarding";
+import Progress from "./Progress";
 import Settings from "./Settings";
 import Templates from "./Templates";
 import Today from "./Today";
@@ -221,7 +222,7 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  const [view, setView] = useState<"today" | "chat" | "templates" | "about">("today");
+  const [view, setView] = useState<"today" | "chat" | "templates" | "progress" | "about">("today");
   const [showSettings, setShowSettings] = useState(false);
   const [showDash, setShowDash] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -413,12 +414,13 @@ export default function App() {
               ["today", "today"],
               ["chat", "chat"],
               ["templates", "plans"],
+              ["progress", "progress"],
               ["about", "about"],
             ] as const).map(([v, label]) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold capitalize transition sm:px-3 sm:text-xs ${
+                className={`rounded-lg px-1.5 py-1.5 text-[10px] font-semibold capitalize transition sm:px-2.5 sm:text-xs ${
                   view === v ? "bg-brand text-white" : "text-mut hover:text-white"
                 }`}
               >
@@ -458,6 +460,8 @@ export default function App() {
               refreshDash();
             }}
           />
+        ) : view === "progress" ? (
+          <Progress />
         ) : view === "about" ? (
           <About
             onTalk={() => {

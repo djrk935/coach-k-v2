@@ -832,6 +832,180 @@ async def remove_push_subscription(endpoint: str) -> None:
         await conn.execute("DELETE FROM push_subscriptions WHERE endpoint = $1", endpoint)
 
 
+# ===== Progress dashboard =====
+
+_CANONICAL_LIFTS = [
+    ("squat", ("back squat", "squat", "front squat")),
+    ("bench", ("bench press", "bench")),
+    ("deadlift", ("deadlift",)),
+    ("press", ("overhead press", "press")),
+]
+
+
+def _match_canonical(exercise: str) -> str | None:
+    name = exercise.lower()
+    for key, patterns in _CANONICAL_LIFTS:
+        for p in patterns:
+            if p in name:
+                # Prefer exact-ish; avoid "leg press" matching press
+                if key == "press" and ("bench" in name or "leg" in name):
+                    continue
+                if key == "squat" and "box" in name:
+                    continue
+                return key
+    return None
+
+
+async def get_progress(user_id: str, days: int = 90) -> dict:
+    """Series for the Progress view: e1RM by lift, bodyweight, readiness, load, PRs."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        set_rows = await conn.fetch(
+            """SELECT w.performed_at::date AS day, ws.exercise, ws.weight_lbs, ws.reps, ws.is_pr
+               FROM workout_sets ws
+               JOIN workouts w ON w.id = ws.workout_id
+               WHERE w.user_id = $1
+                     AND w.performed_at > now() - ($2::text || ' days')::interval
+                     AND ws.weight_lbs IS NOT NULL
+               ORDER BY day ASC""",
+            user_id, days,
+        )
+        readiness_rows = await conn.fetch(
+            """SELECT for_date, readiness FROM athlete_readiness
+               WHERE user_id = $1 AND for_date > CURRENT_DATE - $2::int
+               ORDER BY for_date ASC""",
+            user_id, days,
+        )
+        workout_rows = await conn.fetch(
+            """SELECT w.performed_at::date AS day,
+                      COALESCE(w.session_rpe, 7) * COUNT(ws.id) AS load,
+                      COUNT(ws.id) AS sets
+               FROM workouts w
+               LEFT JOIN workout_sets ws ON ws.workout_id = w.id
+               WHERE w.user_id = $1
+                     AND w.performed_at > now() - ($2::text || ' days')::interval
+               GROUP BY w.id, day
+               ORDER BY day ASC""",
+            user_id, days,
+        )
+        pr_rows = await conn.fetch(
+            """SELECT w.performed_at::date AS day, ws.exercise, ws.weight_lbs, ws.reps
+               FROM workout_sets ws
+               JOIN workouts w ON w.id = ws.workout_id
+               WHERE w.user_id = $1 AND ws.is_pr
+                     AND w.performed_at > now() - ($2::text || ' days')::interval
+               ORDER BY w.performed_at DESC
+               LIMIT 12""",
+            user_id, days,
+        )
+
+    # Best e1RM per canonical lift per day
+    daily_best: dict[str, dict[str, float]] = {}
+    for r in set_rows:
+        key = _match_canonical(r["exercise"])
+        if not key:
+            continue
+        e1 = _e1rm(float(r["weight_lbs"]), int(r["reps"] or 1))
+        day = str(r["day"])
+        daily_best.setdefault(key, {})
+        prev = daily_best[key].get(day)
+        if prev is None or e1 > prev:
+            daily_best[key][day] = round(e1, 1)
+
+    lifts = {}
+    for key, series in daily_best.items():
+        points = [{"date": d, "e1rm": v} for d, v in sorted(series.items())]
+        if not points:
+            continue
+        first, last = points[0]["e1rm"], points[-1]["e1rm"]
+        lifts[key] = {
+            "points": points,
+            "current": last,
+            "delta": round(last - first, 1),
+            "delta_pct": round(100 * (last - first) / first, 1) if first else 0,
+        }
+
+    bodyweight = []
+    readiness = []
+    for r in readiness_rows:
+        data = json.loads(r["readiness"]) if isinstance(r["readiness"], str) else dict(r["readiness"])
+        day = str(r["for_date"])
+        if isinstance(data.get("bodyweight_lbs"), (int, float)):
+            bodyweight.append({"date": day, "lbs": float(data["bodyweight_lbs"])})
+        score = data.get("readiness_score")
+        if score is None:
+            # derive rough score like adapt.py
+            parts = []
+            if isinstance(data.get("sleep_h"), (int, float)):
+                parts.append(max(0.0, min(1.0, (float(data["sleep_h"]) - 4) / 4)) * 100)
+            for k, inv in (("soreness_0_10", True), ("stress_0_10", True), ("motivation_0_10", False)):
+                if isinstance(data.get(k), (int, float)):
+                    n = float(data[k]) / 10.0
+                    parts.append((1 - n) * 100 if inv else n * 100)
+            if parts:
+                score = round(sum(parts) / len(parts))
+        if score is not None:
+            readiness.append({"date": day, "score": float(score)})
+
+    # Profile bodyweight as a single point if no readiness series
+    profile = await get_latest_profile(user_id)
+    if not bodyweight and isinstance(profile.get("bodyweight_lbs"), (int, float)):
+        bodyweight.append({
+            "date": str(date.today()),
+            "lbs": float(profile["bodyweight_lbs"]),
+        })
+
+    load_daily: dict[str, float] = {}
+    for r in workout_rows:
+        d = str(r["day"])
+        load_daily[d] = load_daily.get(d, 0) + float(r["load"])
+    load_points = [{"date": d, "load": round(v, 1)} for d, v in sorted(load_daily.items())]
+
+    # Rolling 7/28 ACWR-ish series where possible
+    acwr_points = []
+    from datetime import datetime, timedelta
+    if load_points:
+        by_date = {p["date"]: p["load"] for p in load_points}
+        start = datetime.strptime(load_points[0]["date"], "%Y-%m-%d").date()
+        end = date.today()
+        cur = start + timedelta(days=14)  # need chronic window
+        while cur <= end:
+            acute = sum(
+                by_date.get(str(cur - timedelta(days=i)), 0) for i in range(7)
+            ) / 7
+            chronic = sum(
+                by_date.get(str(cur - timedelta(days=i)), 0) for i in range(28)
+            ) / 28
+            if chronic > 0:
+                acwr_points.append({"date": str(cur), "acwr": round(acute / chronic, 2)})
+            cur += timedelta(days=1)
+
+    load_summary = await get_load_summary(user_id)
+    sessions = len(workout_rows)
+
+    return {
+        "days": days,
+        "lifts": lifts,
+        "bodyweight": bodyweight,
+        "readiness": readiness,
+        "load": load_points,
+        "acwr_series": acwr_points,
+        "load_summary": load_summary,
+        "prs": [
+            {
+                "date": str(r["day"]),
+                "exercise": r["exercise"],
+                "weight_lbs": float(r["weight_lbs"]) if r["weight_lbs"] is not None else None,
+                "reps": r["reps"],
+            }
+            for r in pr_rows
+        ],
+        "sessions": sessions,
+        "profile_1rms": profile.get("lifts_1rm") or {},
+        "goal_mode": profile.get("goal_mode"),
+    }
+
+
 # ===== Context assembly =====
 
 def format_context(
