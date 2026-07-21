@@ -138,7 +138,8 @@ MEMORY_EXTRACT = """You maintain the athlete's persistent state. From this excha
 extract ONLY what should persist (new PRs, changed goals, equipment, injuries,
 readiness signals, a reported workout, pain, goal_mode, nutrition preferences).
 Omit anything already known from the profile, and anything speculative. If nothing
-should persist, return all fields null/empty.
+should persist, return empty values: profile_patch/readiness/workout as null, and
+pain as an empty list []. Never emit the string "null" for list fields.
 
 goal_mode if mentioned should be one of: strength | hypertrophy | athleticism |
 recomposition | general."""

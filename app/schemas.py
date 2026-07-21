@@ -1,8 +1,18 @@
 """Pydantic contracts: the agent emits these; DB + PDF renderer consume them."""
 
+import json
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _nullish(v: Any) -> Any:
+    """LLM structured output sometimes emits the string 'null' instead of null."""
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip().lower() in ("", "null", "none", "undefined"):
+        return None
+    return v
 
 
 # ===== Program artifact (agent → DB → PDF) =====
@@ -165,4 +175,30 @@ class MemoryDelta(BaseModel):
     workout: WorkoutLog | None = Field(
         None, description="A completed workout being reported, if any"
     )
-    pain: list[PainEvent] = Field(default_factory=list)
+    pain: list[PainEvent] = Field(
+        default_factory=list,
+        description="Pain events this turn; use [] when none — never the string 'null'",
+    )
+
+    @field_validator("profile_patch", "readiness", "workout", mode="before")
+    @classmethod
+    def _coerce_optional_nullish(cls, v: Any) -> Any:
+        return _nullish(v)
+
+    @field_validator("pain", mode="before")
+    @classmethod
+    def _coerce_pain_list(cls, v: Any) -> Any:
+        v = _nullish(v)
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+            except Exception:
+                return []
+            v = _nullish(parsed)
+            if v is None:
+                return []
+        if isinstance(v, dict):
+            return [v]
+        return v

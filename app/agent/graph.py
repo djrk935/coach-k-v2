@@ -310,15 +310,19 @@ async def act(state: AgentState) -> dict:
 async def update_memory(state: AgentState) -> dict:
     if state["intent"] in ("log", "physique"):
         return {}  # already persisted in act()
-    structured = _fast.with_structured_output(MemoryDelta)
-    delta: MemoryDelta = await structured.ainvoke(
-        [
-            {"role": "system", "content": prompts.MEMORY_EXTRACT},
-            {"role": "system", "content": "KNOWN PROFILE:\n" + str(state["profile"])},
-            *state["messages"][-2:],
-        ]
-    )
-    await tools.apply_memory_delta(state["user_id"], delta)
+    try:
+        structured = _fast.with_structured_output(MemoryDelta)
+        delta: MemoryDelta = await structured.ainvoke(
+            [
+                {"role": "system", "content": prompts.MEMORY_EXTRACT},
+                {"role": "system", "content": "KNOWN PROFILE:\n" + str(state["profile"])},
+                *state["messages"][-2:],
+            ]
+        )
+        await tools.apply_memory_delta(state["user_id"], delta)
+    except Exception:
+        # Never fail the user-facing turn on memory extraction / schema quirks.
+        pass
     return {}
 
 
