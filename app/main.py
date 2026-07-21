@@ -549,12 +549,17 @@ async def dashboard():
     }
 
 
-@app.get("/api/progress")
-async def progress(days: int = 90):
-    """Athlete progress series for the Progress dashboard."""
-    days = max(14, min(days, 365))
-    user_id = await tools.get_or_create_user()
-    return await tools.get_progress(user_id, days=days)
+@app.get("/api/warmup")
+async def warmup_preview(weight_lbs: float, exercise: str = "", set_type: str = "straight"):
+    """Preview a warm-up ramp for a working weight (used when the athlete edits load)."""
+    from app.coaching.warmup import warmup_ramp
+
+    if weight_lbs <= 0:
+        raise HTTPException(400, "weight_lbs must be positive")
+    return {
+        "working_lbs": weight_lbs,
+        "warmup_sets": warmup_ramp(weight_lbs, exercise=exercise, set_type=set_type),
+    }
 
 
 # Production: serve the built frontend from the same process (no Vite proxy).

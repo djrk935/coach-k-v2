@@ -484,6 +484,7 @@ async def get_today(user_id: str) -> dict | None:
     from app.coaching.adapt import adaptation_for, apply_volume_scale
     from app.coaching.progression import apply_progression_to_suggestion, progression_delta_lbs
     from app.coaching.swaps import form_cue_for, suggest_swap
+    from app.coaching.warmup import warmup_ramp
 
     prog = await get_active_program(user_id)
     if not prog:
@@ -547,6 +548,11 @@ async def get_today(user_id: str) -> dict | None:
         suggested = _suggest_weight(ex["exercise"], ex.get("intensity", ""), one_rms, last)
         suggested = apply_progression_to_suggestion(suggested, prog_hint)
         swap = suggest_swap(ex["exercise"], pain_regions) if pain_regions else None
+        warmups = warmup_ramp(
+            suggested,
+            exercise=ex["exercise"],
+            set_type=ex.get("set_type") or "straight",
+        )
         exercises.append({
             **ex,
             "suggested_weight_lbs": suggested,
@@ -555,6 +561,7 @@ async def get_today(user_id: str) -> dict | None:
             "form_cue": form_cue_for(ex["exercise"]),
             "swap_suggestion": swap,
             "progression": prog_hint,
+            "warmup_sets": warmups,
         })
 
     catch_up = None
@@ -580,16 +587,22 @@ async def get_today(user_id: str) -> dict | None:
             for i, ex in enumerate(apply_volume_scale(raw_exercises, adapt["volume_scale"])):
                 last = await get_last_weight(user_id, ex["exercise"])
                 media = media_for(ex["exercise"])
+                suggested = _suggest_weight(
+                    ex["exercise"], ex.get("intensity", ""), one_rms, last
+                )
                 exercises.append({
                     **ex,
-                    "suggested_weight_lbs": _suggest_weight(
-                        ex["exercise"], ex.get("intensity", ""), one_rms, last
-                    ),
+                    "suggested_weight_lbs": suggested,
                     "logged_sets": logged_by_slot.get(i, []),
                     "image_urls": media["image_urls"] if media else [],
                     "form_cue": form_cue_for(ex["exercise"]),
                     "swap_suggestion": suggest_swap(ex["exercise"], pain_regions) if pain_regions else None,
                     "progression": None,
+                    "warmup_sets": warmup_ramp(
+                        suggested,
+                        exercise=ex["exercise"],
+                        set_type=ex.get("set_type") or "straight",
+                    ),
                 })
 
     return {

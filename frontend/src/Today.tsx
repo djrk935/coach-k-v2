@@ -42,18 +42,35 @@ function ExerciseCard({
   );
   const [reps, setReps] = useState(String(parseRepTarget(ex.reps) ?? ""));
   const [busy, setBusy] = useState(false);
+  const [showWarmup, setShowWarmup] = useState(true);
+  const [warmupDone, setWarmupDone] = useState<Record<number, boolean>>({});
   const done = ex.logged_sets.length;
   const target = ex.sets;
   const lastPr = ex.logged_sets.some((s) => s.is_pr);
+  const warmups = ex.warmup_sets ?? [];
 
   useEffect(() => {
     setWeight(ex.suggested_weight_lbs != null ? String(ex.suggested_weight_lbs) : "");
+    setWarmupDone({});
   }, [ex.suggested_weight_lbs, ex.exercise]);
 
   async function logSet() {
     setBusy(true);
     await onLog(slot, ex.exercise, weight ? Number(weight) : null, reps ? Number(reps) : null, null);
     setBusy(false);
+  }
+
+  function loadWarmup(i: number) {
+    const w = warmups[i];
+    if (!w) return;
+    if (w.weight_lbs != null) setWeight(String(w.weight_lbs));
+    setReps(String(w.reps));
+    setWarmupDone((d) => ({ ...d, [i]: true }));
+  }
+
+  function loadWorking() {
+    if (ex.suggested_weight_lbs != null) setWeight(String(ex.suggested_weight_lbs));
+    setReps(String(parseRepTarget(ex.reps) ?? ""));
   }
 
   return (
@@ -95,6 +112,53 @@ function ExerciseCard({
           {done}/{target} sets
         </div>
       </div>
+
+      {warmups.length > 0 && (
+        <div className="mt-3 rounded-xl border border-line/70 bg-ink/50 p-2.5">
+          <button
+            type="button"
+            onClick={() => setShowWarmup((s) => !s)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mut">
+              Warm-up ramp
+            </span>
+            <span className="text-[11px] text-mut">{showWarmup ? "Hide" : "Show"}</span>
+          </button>
+          {showWarmup && (
+            <div className="mt-2 space-y-1.5">
+              {warmups.map((w, i) => (
+                <button
+                  key={`${w.label}-${i}`}
+                  type="button"
+                  onClick={() => loadWarmup(i)}
+                  className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                    warmupDone[i]
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      : "border-line bg-panel/60 hover:border-brand"
+                  }`}
+                >
+                  <span className="font-medium tabular-nums">{w.label}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-mut">
+                    {warmupDone[i] ? "Loaded" : "Load"}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={loadWorking}
+                className="flex w-full items-center justify-between rounded-lg border border-brand/40 bg-brand/10 px-2.5 py-2 text-left text-xs font-semibold text-brand"
+              >
+                <span>
+                  Working set
+                  {ex.suggested_weight_lbs != null ? ` · ${ex.suggested_weight_lbs} lbs` : ""}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider">Load</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {ex.logged_sets.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

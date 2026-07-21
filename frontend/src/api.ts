@@ -74,6 +74,12 @@ export type LoggedSet = {
   exercise: string; set_index: number; weight_lbs: number | null;
   reps: number | null; rir: number | null; is_pr: boolean;
 };
+export type WarmupSet = {
+  weight_lbs: number | null;
+  reps: number;
+  pct: number | null;
+  label: string;
+};
 export type TodayExercise = {
   exercise: string; sets: number; reps: string; intensity: string;
   tempo: string | null; rest_s: number | null; notes: string | null;
@@ -84,6 +90,7 @@ export type TodayExercise = {
   progression?: { delta_lbs: number; reason: string } | null;
   adapted?: boolean;
   swapped?: boolean;
+  warmup_sets?: WarmupSet[];
 };
 export type TodayAdaptation = {
   score: number | null;
