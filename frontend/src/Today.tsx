@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { api, InjuryProtocol, LoggedSet, TodayExercise, TodayPlan } from "./api";
+import {
+  api,
+  FormCheckAssessment,
+  InjuryProtocol,
+  LoggedSet,
+  TodayExercise,
+  TodayPlan,
+  videoToFrameDataUrls,
+} from "./api";
 import RestTimer from "./RestTimer";
 import { FlipImage } from "./Templates";
 
@@ -44,6 +52,10 @@ function ExerciseCard({
   const [busy, setBusy] = useState(false);
   const [showWarmup, setShowWarmup] = useState(true);
   const [warmupDone, setWarmupDone] = useState<Record<number, boolean>>({});
+  const [formBusy, setFormBusy] = useState(false);
+  const [formErr, setFormErr] = useState("");
+  const [formResult, setFormResult] = useState<FormCheckAssessment | null>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   const done = ex.logged_sets.length;
   const target = ex.sets;
   const lastPr = ex.logged_sets.some((s) => s.is_pr);
@@ -52,6 +64,8 @@ function ExerciseCard({
   useEffect(() => {
     setWeight(ex.suggested_weight_lbs != null ? String(ex.suggested_weight_lbs) : "");
     setWarmupDone({});
+    setFormResult(null);
+    setFormErr("");
   }, [ex.suggested_weight_lbs, ex.exercise]);
 
   async function logSet() {
@@ -71,6 +85,37 @@ function ExerciseCard({
   function loadWorking() {
     if (ex.suggested_weight_lbs != null) setWeight(String(ex.suggested_weight_lbs));
     setReps(String(parseRepTarget(ex.reps) ?? ""));
+  }
+
+  async function onVideoPicked(file: File | null) {
+    if (!file) return;
+    setFormBusy(true);
+    setFormErr("");
+    setFormResult(null);
+    try {
+      if (file.size > 80 * 1024 * 1024) {
+        throw new Error("Keep the clip under ~80MB — a side-view set is enough.");
+      }
+      const frames = await videoToFrameDataUrls(file, { maxFrames: 5, maxDim: 960, maxSeconds: 20 });
+      if (!frames.length) throw new Error("Couldn't pull frames from that clip.");
+      const r = await api("/api/form-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exercise: ex.exercise,
+          images: frames,
+          form_cue: ex.form_cue || undefined,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "Form check failed");
+      setFormResult(data.assessment as FormCheckAssessment);
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "Form check failed");
+    } finally {
+      setFormBusy(false);
+      if (videoRef.current) videoRef.current.value = "";
+    }
   }
 
   return (
@@ -198,6 +243,73 @@ function ExerciseCard({
         >
           {done >= target ? "Done" : "Log Set"}
         </button>
+      </div>
+
+      <div className="mt-2">
+        <input
+          ref={videoRef}
+          type="file"
+          accept="video/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => onVideoPicked(e.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button"
+          disabled={formBusy}
+          onClick={() => videoRef.current?.click()}
+          className="ck-btn ck-btn-ghost w-full py-2 text-xs"
+        >
+          {formBusy ? "Reading your set…" : "Check form (video)"}
+        </button>
+        {formErr && <p className="mt-1.5 text-[11px] text-amber-300">{formErr}</p>}
+        {formResult && (
+          <div className="mt-2 rounded-xl border border-line/80 bg-ink/40 p-3 animate-rise">
+            <p className="ck-eyebrow">Form check</p>
+            <p className="mt-1 text-sm leading-snug">{formResult.summary}</p>
+            {formResult.looking_good?.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                  Looking good
+                </p>
+                <ul className="mt-1 space-y-1 text-xs text-mut">
+                  {formResult.looking_good.map((g) => (
+                    <li key={g}>· {g}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {formResult.cues?.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">
+                  Next-set cues
+                </p>
+                <ul className="mt-1 space-y-1 text-xs text-fg-dim">
+                  {formResult.cues.map((c) => (
+                    <li key={c}>· {c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {formResult.safety_flags?.length > 0 && (
+              <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                  Watch
+                </p>
+                <ul className="mt-1 space-y-1 text-xs text-amber-100/90">
+                  {formResult.safety_flags.map((f) => (
+                    <li key={f}>· {f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {formResult.unclear && (
+              <p className="mt-2 text-[11px] text-mut">
+                Film was unclear — try a side angle with the full bar path in frame.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

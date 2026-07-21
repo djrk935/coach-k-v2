@@ -86,6 +86,26 @@ class PhysiqueAssessment(BaseModel):
     )
 
 
+class FormCheckAssessment(BaseModel):
+    """Lift technique feedback from a short video broken into keyframes."""
+
+    summary: str = Field(..., description="2-3 sentence overall read in coach voice")
+    looking_good: list[str] = Field(
+        ..., description="1-3 things that look solid — athletes need the wins"
+    )
+    cues: list[str] = Field(
+        ..., description="2-4 concrete, actionable technique cues for the next set"
+    )
+    safety_flags: list[str] = Field(
+        default_factory=list,
+        description="Red flags only when clearly visible (e.g. lumbar rounding under load)",
+    )
+    unclear: bool = Field(
+        False,
+        description="True if frames are too dark/blurry/wrong angle to judge honestly",
+    )
+
+
 # ===== Voice/quick logging (Today view) =====
 
 class VoiceSetLog(BaseModel):

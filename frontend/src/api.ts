@@ -24,6 +24,78 @@ export async function fileToDataUrl(file: File, maxDim = 1280): Promise<string> 
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
+/** Sample keyframes from a short gym clip for vision form check. */
+export async function videoToFrameDataUrls(
+  file: File,
+  opts: { maxFrames?: number; maxDim?: number; maxSeconds?: number } = {},
+): Promise<string[]> {
+  const maxFrames = opts.maxFrames ?? 5;
+  const maxDim = opts.maxDim ?? 960;
+  const maxSeconds = opts.maxSeconds ?? 20;
+  const url = URL.createObjectURL(file);
+  try {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    await new Promise<void>((res, rej) => {
+      video.onloadedmetadata = () => res();
+      video.onerror = () => rej(new Error("Couldn't read that video"));
+    });
+    const duration = Math.min(
+      Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1,
+      maxSeconds,
+    );
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable");
+
+    const stamps: number[] = [];
+    if (maxFrames <= 1 || duration < 0.2) {
+      stamps.push(Math.min(0.05, duration * 0.5));
+    } else {
+      for (let i = 0; i < maxFrames; i++) {
+        const t = (i / (maxFrames - 1)) * Math.max(duration - 0.05, 0);
+        stamps.push(Math.max(0, t));
+      }
+    }
+
+    const frames: string[] = [];
+    for (const t of stamps) {
+      await new Promise<void>((res, rej) => {
+        const onSeek = () => {
+          video.removeEventListener("seeked", onSeek);
+          res();
+        };
+        video.addEventListener("seeked", onSeek);
+        video.onerror = () => rej(new Error("Seek failed"));
+        try {
+          video.currentTime = t;
+        } catch (e) {
+          rej(e instanceof Error ? e : new Error("Seek failed"));
+        }
+      });
+      const scale = Math.min(1, maxDim / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+      canvas.width = Math.max(1, Math.round((video.videoWidth || 1) * scale));
+      canvas.height = Math.max(1, Math.round((video.videoHeight || 1) * scale));
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push(canvas.toDataURL("image/jpeg", 0.8));
+    }
+    return frames;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export type FormCheckAssessment = {
+  summary: string;
+  looking_good: string[];
+  cues: string[];
+  safety_flags: string[];
+  unclear: boolean;
+};
+
 function urlBase64ToUint8Array(base64: string): BufferSource {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");

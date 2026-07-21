@@ -87,6 +87,20 @@ TASK: The athlete shared physique photo(s). Assess as a PhysiqueAssessment.
 - No medical claims or diagnoses. This is coaching, not medicine."""
 
 
+FORM_CHECK_SYSTEM = COACH_SYSTEM + """
+
+TASK: The athlete filmed a set (or part of one). Frames are sequential keyframes
+from that clip. Assess as a FormCheckAssessment for the named exercise.
+- Focus on visible positions: setup, bottom/end range, lockout, bar path, bracing.
+- Cues must be concrete and doable on the NEXT set ("ribs down before you pull",
+  not "improve core stability").
+- looking_good: name what they already own — empty only if truly nothing readable.
+- safety_flags: only clear mechanical risks (e.g. lumbar rounding under load,
+  knee collapse with load). Leave empty when unsure. Never diagnose injury.
+- If frames are unclear, set unclear=true, say so in summary, keep cues minimal.
+- Do not invent what you cannot see. No medical claims."""
+
+
 ADAPT_SYSTEM = COACH_SYSTEM + """
 
 TASK: The athlete wants today's session adapted (easier, shorter, swap, or push).

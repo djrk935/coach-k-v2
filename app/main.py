@@ -13,7 +13,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from pydantic import BaseModel
 
 from app.agent import tools
-from app.agent.graph import build_graph, parse_voice_set
+from app.agent.graph import build_graph, parse_voice_set, run_form_check
 from app.artifacts.renderer import render_program_pdf
 from app.config import settings
 from app.db import close_pool
@@ -369,6 +369,38 @@ async def today_apply_protocol_swaps(body: ApplyProtocolIn):
         raise HTTPException(400, str(e)) from e
     day = await tools.get_today(user_id)
     return {**result, "today": day}
+
+
+class FormCheckIn(BaseModel):
+    exercise: str
+    images: list[str]  # data URLs — keyframes from a short clip
+    note: str | None = None
+    form_cue: str | None = None
+
+
+@app.post("/api/form-check")
+async def form_check(body: FormCheckIn):
+    """Video form check: client sends 3–5 JPEG keyframes; Coach K returns cues."""
+    exercise = (body.exercise or "").strip()
+    if not exercise:
+        raise HTTPException(400, "exercise required")
+    if not body.images:
+        raise HTTPException(400, "images required")
+    if len(body.images) > 6:
+        raise HTTPException(400, "max 6 frames")
+    user_id = await tools.get_or_create_user()
+    try:
+        return await run_form_check(
+            user_id,
+            exercise,
+            body.images,
+            note=body.note,
+            form_cue=body.form_cue,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        raise HTTPException(503, f"form check unavailable: {str(e)[:150]}") from e
 
 
 @app.get("/api/coach/weekly-review")

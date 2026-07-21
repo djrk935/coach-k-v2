@@ -62,6 +62,61 @@ async def parse_voice_set(text: str, exercise_names: list[str]) -> VoiceSetLog:
     ])
 
 
+async def run_form_check(
+    user_id: str,
+    exercise: str,
+    images: list[str],
+    note: str | None = None,
+    form_cue: str | None = None,
+) -> dict:
+    """Vision form check from client-extracted video keyframes (data URLs)."""
+    from app.schemas import FormCheckAssessment
+
+    if not images:
+        raise ValueError("at least one frame required")
+    if len(images) > 6:
+        raise ValueError("max 6 frames")
+
+    PHOTOS_DIR.mkdir(exist_ok=True)
+    form_dir = PHOTOS_DIR / "form-check"
+    form_dir.mkdir(exist_ok=True)
+    paths: list[str] = []
+    for url in images:
+        if not url.startswith("data:"):
+            raise ValueError("images must be data URLs")
+        header, _, b64 = url.partition(",")
+        if not b64:
+            raise ValueError("invalid data URL")
+        ext = "png" if "png" in header else "jpg"
+        p = form_dir / f"{date.today()}-{uuid4().hex[:8]}.{ext}"
+        p.write_bytes(b64decode(b64))
+        paths.append(str(p))
+
+    cue_line = f"Known form cue for this lift: {form_cue}" if form_cue else ""
+    note_line = f"Athlete note: {note}" if note else ""
+    user_content: list[dict] = [
+        {
+            "type": "text",
+            "text": (
+                f"Exercise: {exercise}\n"
+                f"{cue_line}\n{note_line}\n"
+                "These images are sequential keyframes from one set. "
+                "Assess technique for this lift."
+            ).strip(),
+        },
+        *[{"type": "image_url", "image_url": {"url": u}} for u in images],
+    ]
+
+    structured = _llm.with_structured_output(FormCheckAssessment)
+    a: FormCheckAssessment = await structured.ainvoke([
+        _sys(prompts.FORM_CHECK_SYSTEM, cache=True),
+        {"role": "user", "content": user_content},
+    ])
+    assessment = a.model_dump()
+    await tools.save_form_check(user_id, exercise, paths, assessment, note)
+    return {"ok": True, "exercise": exercise, "assessment": assessment, "frames": len(paths)}
+
+
 def _text(content) -> str:
     """Anthropic content can be a string or a list of blocks."""
     if isinstance(content, str):

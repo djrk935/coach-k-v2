@@ -315,6 +315,24 @@ async def save_physique_assessment(
             )
 
 
+async def save_form_check(
+    user_id: str,
+    exercise: str,
+    file_paths: list[str],
+    assessment: dict,
+    note: str | None = None,
+) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row_id = await conn.fetchval(
+            """INSERT INTO form_checks (user_id, exercise, note, file_paths, assessment)
+               VALUES ($1, $2, $3, $4::jsonb, $5::jsonb)
+               RETURNING id""",
+            user_id, exercise, note, json.dumps(file_paths), json.dumps(assessment),
+        )
+    return str(row_id)
+
+
 async def get_physique_history(user_id: str, limit: int = 3) -> list[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
