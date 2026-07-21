@@ -42,7 +42,7 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
         <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-white">
           ← All templates
         </button>
-        <h2 className="text-xl font-black">{open.name}</h2>
+        <h2 className="font-display text-xl font-black tracking-tight">{open.name}</h2>
         <p className="mt-1 text-sm text-mut">{open.summary}</p>
         <p className="mt-1 text-xs text-brand">{open.based_on}</p>
         <button
@@ -77,17 +77,30 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
 
   return (
     <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-      <h2 className="text-xl font-black">Plan Templates</h2>
-      <p className="mt-1 text-sm text-mut">
-        Book-grounded starting points. Pick one and Coach K adapts it to your profile, lifts, and readiness.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-line">
+        <img
+          src="/images/rack-focus.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-35"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
+        <div className="relative px-5 py-8 sm:px-7 sm:py-10">
+          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">LIBRARY</p>
+          <h2 className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">
+            Plan Templates
+          </h2>
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/70">
+            Book-grounded starting points. Pick one and Coach K adapts it to your profile, lifts, and readiness.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
         {GOALS.map((g) => (
           <button
             key={g}
             onClick={() => setGoal(g)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-              goal === g ? "bg-brand text-white" : "bg-panel text-mut hover:text-white"
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
+              goal === g ? "bg-brand text-white" : "border border-line bg-panel text-mut hover:text-white"
             }`}
           >
             {g}
@@ -99,10 +112,10 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
           <button
             key={t.id}
             onClick={() => setOpen(t)}
-            className="rounded-xl border border-line bg-panel p-4 text-left hover:border-brand"
+            className="rounded-xl border border-line bg-panel/80 p-4 text-left transition hover:border-brand"
           >
-            <p className="font-bold">{t.name}</p>
-            <p className="mt-0.5 text-xs uppercase tracking-wider text-brand">
+            <p className="font-display font-bold">{t.name}</p>
+            <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-brand">
               {t.goal} · {t.days_per_week} days/wk
             </p>
             <p className="mt-2 text-sm text-mut">{t.summary}</p>

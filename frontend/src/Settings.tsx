@@ -82,7 +82,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-black">Settings</h2>
+          <h2 className="font-display text-lg font-black">Settings</h2>
           <button onClick={onClose} className="text-mut hover:text-white">✕</button>
         </div>
 

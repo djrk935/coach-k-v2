@@ -198,31 +198,53 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
 
   if (!plan?.active) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="text-lg text-mut">No active program yet.</p>
-        <p className="mt-1 text-sm text-mut">Pick a template or ask Coach K to build one.</p>
-        <button onClick={onGoToTemplates} className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white">
-          Browse Templates →
-        </button>
+      <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6 text-center">
+        <img
+          src="/images/training-floor.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/50" />
+        <div className="relative animate-rise">
+          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">TODAY</p>
+          <p className="mt-3 font-display text-2xl font-black tracking-tight">No active program yet.</p>
+          <p className="mt-2 max-w-sm text-sm text-mut">
+            Pick a template or ask Coach K to build one around your goals and schedule.
+          </p>
+          <button
+            onClick={onGoToTemplates}
+            className="mt-6 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+          >
+            Browse Templates →
+          </button>
+        </div>
       </div>
     );
   }
 
   if (finished) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="text-3xl">✅</p>
-        <p className="mt-2 text-lg font-bold">Day complete — nice work.</p>
-        <button
-          onClick={() => {
-            setFinished(false);
-            setLoading(true);
-            load();
-          }}
-          className="mt-4 rounded-xl border border-line px-4 py-2 text-sm font-semibold hover:border-brand"
-        >
-          See what's next →
-        </button>
+      <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6 text-center">
+        <img
+          src="/images/chalk-hands.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-25"
+        />
+        <div className="absolute inset-0 bg-ink/80" />
+        <div className="relative animate-rise">
+          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">SESSION</p>
+          <p className="mt-3 font-display text-2xl font-black tracking-tight">Day complete — nice work.</p>
+          <button
+            onClick={() => {
+              setFinished(false);
+              setLoading(true);
+              load();
+            }}
+            className="mt-6 rounded-xl border border-line px-5 py-2.5 text-sm font-semibold hover:border-brand"
+          >
+            See what's next →
+          </button>
+        </div>
       </div>
     );
   }
@@ -233,7 +255,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
     <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-xl font-black">{plan.day_label}</h2>
+          <h2 className="font-display text-xl font-black tracking-tight">{plan.day_label}</h2>
           <p className="text-sm text-mut">{plan.focus}</p>
         </div>
         {getSpeechRecognition() && (

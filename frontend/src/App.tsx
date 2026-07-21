@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
+import About from "./About";
 import Settings from "./Settings";
 import Templates from "./Templates";
 import Today from "./Today";
@@ -21,24 +22,40 @@ function md(text: string) {
 function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [pw, setPw] = useState("");
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95">
-      <div className="w-80 rounded-2xl bg-panel p-6">
-        <div className="mb-1 font-black tracking-[0.3em] text-brand">COACH K</div>
-        <p className="mb-4 text-sm text-mut">Enter the app password to continue.</p>
-        <input
-          type="password"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && pw) {
-              localStorage.setItem("coachk_key", pw);
-              onUnlock();
-            }
-          }}
-          placeholder="Password"
-          autoFocus
-          className="w-full rounded-lg border border-line bg-ink px-3 py-2 outline-none focus:border-brand"
-        />
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <img
+        src="/images/hero-barbell.jpg"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/45" />
+      <div className="relative w-full max-w-md px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 sm:px-6 sm:pb-10">
+        <p className="animate-rise font-display text-xs font-semibold tracking-[0.4em] text-brand">
+          COACH K
+        </p>
+        <h1 className="animate-rise mt-3 font-display text-4xl font-black leading-none tracking-tight delay-75 sm:text-5xl">
+          Train with a coach who shows up.
+        </h1>
+        <p className="animate-rise mt-4 max-w-sm text-sm leading-relaxed text-white/70 delay-150">
+          Dayan Kijege — science-grounded programming, honest feedback, and workouts that adapt to you.
+        </p>
+        <div className="animate-rise mt-8 rounded-2xl border border-line/80 bg-panel/90 p-5 backdrop-blur-sm delay-200">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-mut">Enter to continue</p>
+          <input
+            type="password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && pw) {
+                localStorage.setItem("coachk_key", pw);
+                onUnlock();
+              }
+            }}
+            placeholder="Password"
+            autoFocus
+            className="w-full rounded-xl border border-line bg-ink px-3 py-3 outline-none focus:border-brand"
+          />
+        </div>
       </div>
     </div>
   );
@@ -68,8 +85,8 @@ function FormLookup() {
   }
 
   return (
-    <section className="rounded-xl bg-panel p-4">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Form Check</h3>
+    <section className="rounded-xl border border-line/70 bg-panel p-4">
+      <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Form Check</h3>
       <div className="flex gap-2">
         <input
           value={q}
@@ -122,16 +139,16 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
 
   return (
     <>
-      <section className="rounded-xl bg-panel p-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Training Load</h3>
-        <div className="text-3xl font-black">
+      <section className="rounded-xl border border-line/70 bg-panel p-4">
+        <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Training Load</h3>
+        <div className="font-display text-3xl font-black">
           {acwr ?? "—"} <span className={`text-sm font-semibold ${tone.cls}`}>{tone.label}</span>
         </div>
         <p className="mt-1 text-xs text-mut">ACWR · {dash?.load?.sessions_28d ?? 0} sessions / 28d</p>
       </section>
 
-      <section className="rounded-xl bg-panel p-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">
+      <section className="rounded-xl border border-line/70 bg-panel p-4">
+        <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
           Today's Readiness
         </h3>
         {today ? (
@@ -151,8 +168,8 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
       </section>
 
       {Object.keys(oneRms).length > 0 && (
-        <section className="rounded-xl bg-panel p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">1RMs</h3>
+        <section className="rounded-xl border border-line/70 bg-panel p-4">
+          <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">1RMs</h3>
           <ul className="space-y-1 text-sm">
             {Object.entries(oneRms).map(([lift, lbs]) => (
               <li key={lift} className="flex justify-between">
@@ -166,8 +183,8 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
 
       <FormLookup />
 
-      <section className="rounded-xl bg-panel p-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-mut">Programs</h3>
+      <section className="rounded-xl border border-line/70 bg-panel p-4">
+        <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Programs</h3>
         {dash?.programs?.length ? (
           <ul className="space-y-2">
             {dash.programs.map((p) => (
@@ -201,7 +218,7 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  const [view, setView] = useState<"today" | "chat" | "templates">("today");
+  const [view, setView] = useState<"today" | "chat" | "templates" | "about">("today");
   const [showSettings, setShowSettings] = useState(false);
   const [showDash, setShowDash] = useState(false);
   const [images, setImages] = useState<string[]>([]);
@@ -339,10 +356,14 @@ export default function App() {
     <div className="flex h-full min-h-0">
       {/* ===== Main column ===== */}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:gap-3 sm:px-4 sm:py-3">
-          <span className="text-sm font-black tracking-[0.25em] text-brand sm:text-base sm:tracking-[0.3em]">
+        <header className="flex flex-wrap items-center gap-2 border-b border-line/80 bg-ink/60 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3">
+          <button
+            onClick={() => setView("about")}
+            className="font-display text-sm font-extrabold tracking-[0.25em] text-brand transition hover:brightness-110 sm:text-base sm:tracking-[0.3em]"
+            title="About Coach K"
+          >
             COACH K
-          </span>
+          </button>
           {/* Desktop: chat tools sit next to the brand. Phones: full-width second row. */}
           {view === "chat" && (
             <div className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
@@ -366,12 +387,12 @@ export default function App() {
             </div>
           )}
           <div className="flex-1" />
-          <nav className="flex gap-1 rounded-lg border border-line p-0.5">
-            {(["today", "chat", "templates"] as const).map((v) => (
+          <nav className="flex gap-0.5 rounded-xl border border-line bg-panel/50 p-0.5">
+            {(["today", "chat", "templates", "about"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-md px-2.5 py-1.5 text-xs font-semibold capitalize sm:px-3 ${
+                className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold capitalize transition sm:px-3 sm:text-xs ${
                   view === v ? "bg-brand text-white" : "text-mut hover:text-white"
                 }`}
               >
@@ -392,7 +413,7 @@ export default function App() {
             className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
             title="Settings"
           >
-            ⚙
+            Settings
           </button>
         </header>
 
@@ -407,16 +428,35 @@ export default function App() {
               );
             }}
           />
+        ) : view === "about" ? (
+          <About
+            onTalk={() => {
+              setView("chat");
+              if (!input) setInput("Hey Coach — here's what I'm training for: ");
+            }}
+          />
         ) : (
           <>
             <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
               {msgs.length === 0 && (
-                <div className="mt-16 text-center text-mut sm:mt-24">
-                  <p className="text-lg">What are we training for?</p>
-                  <p className="mx-auto mt-2 max-w-md text-sm">
-                    Ask for a program, log a session, check in — or attach physique photos with 📎 for
-                    an honest assessment.
-                  </p>
+                <div className="animate-fade relative mx-auto mt-6 overflow-hidden rounded-2xl border border-line sm:mt-10">
+                  <img
+                    src="/images/atmosphere-kettle.jpg"
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover opacity-40"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/80 to-ink/40" />
+                  <div className="relative px-6 py-14 text-center sm:py-20">
+                    <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">
+                      COACH K
+                    </p>
+                    <p className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
+                      What are we training for?
+                    </p>
+                    <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/70">
+                      Ask for a program, log a session, check in — or attach physique photos for an honest assessment.
+                    </p>
+                  </div>
                 </div>
               )}
               {msgs.map((m, i) => (
@@ -424,8 +464,8 @@ export default function App() {
                   <div
                     className={
                       m.role === "user"
-                        ? "max-w-[88%] rounded-2xl rounded-br-sm bg-brand/90 px-4 py-2.5 text-white sm:max-w-[70%]"
-                        : "max-w-[92%] rounded-2xl rounded-bl-sm bg-panel px-4 py-2.5 sm:max-w-[85%]"
+                        ? "max-w-[88%] rounded-2xl rounded-br-sm bg-brand px-4 py-2.5 text-white sm:max-w-[70%]"
+                        : "max-w-[92%] rounded-2xl rounded-bl-sm border border-line/60 bg-panel px-4 py-2.5 sm:max-w-[85%]"
                     }
                     dangerouslySetInnerHTML={md(m.text || (busy && i === msgs.length - 1 ? "…" : ""))}
                   />
@@ -434,13 +474,13 @@ export default function App() {
               <div ref={bottomRef} />
             </div>
 
-            <footer className="border-t border-line p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-4">
+            <footer className="border-t border-line/80 bg-ink/70 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-md sm:p-4">
               <div className="mx-auto w-full max-w-3xl">
                 {images.length > 0 && (
                   <div className="mb-2 flex gap-2 overflow-x-auto">
                     {images.map((u, i) => (
                       <div key={i} className="relative shrink-0">
-                        <img src={u} className="h-14 w-14 rounded-lg object-cover" />
+                        <img src={u} alt="" className="h-14 w-14 rounded-lg object-cover" />
                         <button
                           onClick={() => setImages(images.filter((_, j) => j !== i))}
                           className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs text-white"
@@ -466,9 +506,9 @@ export default function App() {
                   <button
                     onClick={() => fileRef.current?.click()}
                     title="Attach physique photos"
-                    className="shrink-0 rounded-xl border border-line px-3 text-lg hover:border-brand"
+                    className="shrink-0 rounded-xl border border-line px-3 text-sm font-semibold text-mut hover:border-brand hover:text-white"
                   >
-                    📎
+                    Photo
                   </button>
                   <input
                     value={input}
@@ -480,7 +520,7 @@ export default function App() {
                   <button
                     onClick={send}
                     disabled={busy}
-                    className="shrink-0 rounded-xl bg-brand px-4 font-semibold text-white disabled:opacity-40 sm:px-5"
+                    className="shrink-0 rounded-xl bg-brand px-4 font-semibold text-white transition hover:brightness-110 disabled:opacity-40 sm:px-5"
                   >
                     Send
                   </button>
