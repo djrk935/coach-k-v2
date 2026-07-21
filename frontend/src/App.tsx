@@ -37,7 +37,8 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           Train with a coach who shows up.
         </h1>
         <p className="animate-rise mt-4 max-w-sm text-sm leading-relaxed text-white/70 delay-150">
-          Dayan Kijege — science-grounded programming, honest feedback, and workouts that adapt to you.
+          Dayan Kijege — from the DRC to Austin. Athlete, coach, and builder. Science-grounded
+          programming with honest feedback.
         </p>
         <div className="animate-rise mt-8 rounded-2xl border border-line/80 bg-panel/90 p-5 backdrop-blur-sm delay-200">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-mut">Enter to continue</p>
