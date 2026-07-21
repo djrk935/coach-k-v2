@@ -499,14 +499,14 @@ export default function App() {
           {/* Phone/tablet: open the dashboard drawer (desktop uses the sidebar). */}
           <button
             onClick={() => setShowDash(true)}
-            className="border border-ink px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand lg:hidden"
+            className="border border-fg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand lg:hidden"
             title="Stats & tools"
           >
             Stats
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="border border-ink px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand"
+            className="border border-fg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand"
             title="Settings"
           >
             Settings

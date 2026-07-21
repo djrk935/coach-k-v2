@@ -35,7 +35,7 @@ export default function RestTimer({ seconds = 90, onDone, onDismiss }: Props) {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2">
-      <div className="mx-4 flex w-full max-w-sm items-center gap-4 border border-brand bg-white px-4 py-3 shadow-sm">
+      <div className="mx-4 flex w-full max-w-sm items-center gap-4 border border-brand bg-panel px-4 py-3 shadow-sm">
         <div className="relative h-16 w-16 shrink-0">
           <svg viewBox="0 0 100 100" className="h-full w-full rest-ring">
             <circle cx="50" cy="50" r={r} fill="none" stroke="#e4dfdf" strokeWidth="8" />

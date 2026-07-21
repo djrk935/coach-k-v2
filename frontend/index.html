@@ -1,11 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Coach K — Dayan Kijege</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#e11d2e" />
+    <script>
+      try {
+        var t = localStorage.getItem("coachk_theme");
+        if (t === "dark" || t === "light") {
+          document.documentElement.setAttribute("data-theme", t);
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute("content", t === "dark" ? "#0a0a0a" : "#e11d2e");
+        }
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="Coach K by Dayan Kijege — personal strength coaching from the DRC to Austin. Science-grounded programs that adapt to you."

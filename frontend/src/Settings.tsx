@@ -7,6 +7,7 @@ import {
   promptInstall,
   subscribePwaInstall,
 } from "./pwaInstall";
+import { type BgTheme, readTheme, setTheme } from "./theme";
 
 type Props = {
   profile: Record<string, unknown>;
@@ -29,6 +30,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
     ...Object.fromEntries(LIFTS.map((l) => [l, rms[l] ? String(rms[l]) : ""])),
   } as Record<string, string>);
   const [saving, setSaving] = useState(false);
+  const [bgTheme, setBgTheme] = useState<BgTheme>(() => readTheme());
   const [pushStatus, setPushStatus] = useState<string>(
     typeof Notification !== "undefined" && Notification.permission === "granted"
       ? "Notifications are on."
@@ -40,6 +42,11 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
   const iosHint = isIosSafari() && !standalone;
 
   useEffect(() => subscribePwaInstall(() => setInstallReady(canPromptInstall())), []);
+
+  function chooseTheme(next: BgTheme) {
+    setBgTheme(next);
+    setTheme(next);
+  }
 
   async function handleEnablePush() {
     const result = await enablePush();
@@ -114,7 +121,40 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
           <button onClick={onClose} className="text-mut hover:text-brand">✕</button>
         </div>
 
-        <section className="mb-5 rounded-xl border border-line p-3">
+        <section className="mb-5 border border-line p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-mut">
+            Appearance
+          </h3>
+          <p className="mb-3 text-xs text-mut">
+            Signal Strip stays red either way — pick a paper or dark field.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { id: "light", label: "Paper", hint: "White field" },
+                { id: "dark", label: "Dark", hint: "Black field" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => chooseTheme(opt.id)}
+                className={`border px-3 py-3 text-left transition ${
+                  bgTheme === opt.id
+                    ? "border-brand bg-brand/10"
+                    : "border-line hover:border-brand"
+                }`}
+              >
+                <span className="block font-display text-sm font-bold uppercase tracking-wider">
+                  {opt.label}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-mut">{opt.hint}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-5 border border-line p-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-mut">
             App &amp; offline
           </h3>
@@ -134,8 +174,8 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
             </button>
           ) : iosHint ? (
             <p className="text-xs text-mut">
-              On iPhone: tap <span className="font-semibold text-white">Share</span>, then{" "}
-              <span className="font-semibold text-white">Add to Home Screen</span>.
+              On iPhone: tap <span className="font-semibold text-fg">Share</span>, then{" "}
+              <span className="font-semibold text-fg">Add to Home Screen</span>.
             </p>
           ) : (
             <p className="text-xs text-mut">
