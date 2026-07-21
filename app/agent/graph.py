@@ -199,6 +199,7 @@ async def act(state: AgentState) -> dict:
         valid = set(state.get("retrieved_ids", []))
         plan.citations = [c for c in plan.citations if c.chunk_id in valid]
         program_id = await tools.save_program(state["user_id"], plan)
+        await tools.get_or_init_progress(state["user_id"], program_id)
         # Persist nutrition targets onto profile for ongoing check-ins.
         if plan.nutrition:
             await tools.apply_profile_patch(state["user_id"], {

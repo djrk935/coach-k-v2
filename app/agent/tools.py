@@ -10,6 +10,36 @@ from app.schemas import MemoryDelta, WorkoutLog, WorkoutPlan
 DEFAULT_EMAIL = "owner@coach-k.local"  # single-athlete deployment
 
 
+def _as_dict(val: Any) -> dict:
+    """Decode JSONB that may arrive as dict or (legacy) JSON string."""
+    if val is None:
+        return {}
+    if isinstance(val, memoryview):
+        val = val.tobytes().decode()
+    if isinstance(val, bytes):
+        val = val.decode()
+    if isinstance(val, str):
+        val = json.loads(val)
+    # One more pass if it was double-encoded as a JSON string scalar
+    if isinstance(val, str):
+        val = json.loads(val)
+    return dict(val) if isinstance(val, dict) else {}
+
+
+def _as_list(val: Any) -> list:
+    if val is None:
+        return []
+    if isinstance(val, memoryview):
+        val = val.tobytes().decode()
+    if isinstance(val, bytes):
+        val = val.decode()
+    if isinstance(val, str):
+        val = json.loads(val)
+    if isinstance(val, str):
+        val = json.loads(val)
+    return list(val) if isinstance(val, list) else []
+
+
 async def get_or_create_user(email: str = DEFAULT_EMAIL) -> str:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -47,7 +77,7 @@ async def get_latest_profile(user_id: str) -> dict:
                WHERE user_id = $1 ORDER BY version DESC LIMIT 1""",
             user_id,
         )
-    return json.loads(row) if row else {}
+    return _as_dict(row) if row else {}
 
 
 async def apply_profile_patch(user_id: str, patch: dict, updated_by: str = "agent") -> dict:
@@ -59,7 +89,7 @@ async def apply_profile_patch(user_id: str, patch: dict, updated_by: str = "agen
             """INSERT INTO user_profiles (user_id, version, profile, updated_by)
                VALUES ($1,
                        COALESCE((SELECT MAX(version) FROM user_profiles WHERE user_id = $1), 0) + 1,
-                       $2, $3)""",
+                       $2::jsonb, $3)""",
             user_id, json.dumps(merged), updated_by,
         )
     return merged
@@ -76,7 +106,7 @@ async def get_recent_readiness(user_id: str, days: int = 14) -> list[dict]:
                ORDER BY for_date DESC""",
             user_id, days,
         )
-    return [{"date": str(r["for_date"]), **json.loads(r["readiness"])} for r in rows]
+    return [{"date": str(r["for_date"]), **_as_dict(r["readiness"])} for r in rows]
 
 
 async def upsert_readiness(user_id: str, entry: dict, for_date: date | None = None) -> None:
@@ -87,7 +117,7 @@ async def upsert_readiness(user_id: str, entry: dict, for_date: date | None = No
     async with pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO athlete_readiness (user_id, for_date, readiness)
-               VALUES ($1, $2, $3)
+               VALUES ($1, $2, $3::jsonb)
                ON CONFLICT (user_id, for_date)
                DO UPDATE SET readiness = athlete_readiness.readiness || EXCLUDED.readiness""",
             user_id, for_date or date.today(), json.dumps(entry),
@@ -234,13 +264,17 @@ async def get_load_summary(user_id: str) -> dict:
 
 async def save_program(user_id: str, plan: WorkoutPlan) -> str:
     pool = await get_pool()
+    # Pass JSON text with an explicit ::jsonb cast so Postgres stores an object,
+    # not a JSON string scalar (asyncpg would otherwise double-encode a str).
+    plan_json = json.dumps(plan.model_dump(mode="json"))
+    citations_json = json.dumps([c.model_dump(mode="json") for c in plan.citations])
     async with pool.acquire() as conn:
         pid = await conn.fetchval(
             """INSERT INTO programs (user_id, name, goal, plan, citations)
-               VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+               VALUES ($1, $2, $3, $4::jsonb, $5::jsonb) RETURNING id""",
             user_id, plan.program_name, plan.goal,
-            plan.model_dump_json(),
-            json.dumps([c.model_dump() for c in plan.citations]),
+            plan_json,
+            citations_json,
         )
     return str(pid)
 
@@ -253,7 +287,7 @@ async def get_program(program_id: str) -> dict | None:
         )
     if not row:
         return None
-    return {"plan": json.loads(row["plan"]), "created_at": str(row["created_at"])}
+    return {"plan": _as_dict(row["plan"]), "created_at": str(row["created_at"])}
 
 
 async def list_programs(user_id: str) -> list[dict]:
@@ -310,7 +344,7 @@ async def save_physique_assessment(
         for p in file_paths or [""]:
             await conn.execute(
                 """INSERT INTO physique_photos (user_id, file_path, assessment)
-                   VALUES ($1, $2, $3)""",
+                   VALUES ($1, $2, $3::jsonb)""",
                 user_id, p, json.dumps(assessment),
             )
 
@@ -343,7 +377,7 @@ async def get_physique_history(user_id: str, limit: int = 3) -> list[dict]:
             user_id, limit,
         )
     return [
-        {"date": str(r["taken_at"])[:10], **json.loads(r["assessment"])} for r in rows
+        {"date": str(r["taken_at"])[:10], **_as_dict(r["assessment"])} for r in rows
     ]
 
 
@@ -410,18 +444,29 @@ async def get_last_weight(user_id: str, exercise: str) -> float | None:
 
 async def get_active_program(user_id: str) -> dict | None:
     """Most recent program that's actually executable (non-empty weekly_split) —
-    skips placeholder/acknowledgment rows the agent sometimes saves mid-conversation."""
+    skips placeholder/acknowledgment rows the agent sometimes saves mid-conversation.
+
+    Also accepts legacy rows where `plan` was double-encoded as a JSON string.
+    """
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """SELECT id::text, plan FROM programs
-               WHERE user_id = $1 AND jsonb_array_length(plan -> 'weekly_split') > 0
+               WHERE user_id = $1 AND (
+                 (jsonb_typeof(plan) = 'object'
+                    AND jsonb_array_length(COALESCE(plan -> 'weekly_split', '[]'::jsonb)) > 0)
+                 OR
+                 (jsonb_typeof(plan) = 'string'
+                    AND jsonb_array_length(
+                          COALESCE(((plan #>> '{}')::jsonb) -> 'weekly_split', '[]'::jsonb)
+                        ) > 0)
+               )
                ORDER BY created_at DESC LIMIT 1""",
             user_id,
         )
     if not row:
         return None
-    return {"id": row["id"], "plan": json.loads(row["plan"])}
+    return {"id": row["id"], "plan": _as_dict(row["plan"])}
 
 
 async def get_or_init_progress(user_id: str, program_id: str) -> dict:
@@ -761,7 +806,8 @@ async def finish_today(user_id: str, program_id: str, day_index: int, session_rp
         prog = await conn.fetchval(
             "SELECT plan FROM programs WHERE id = $1", program_id
         )
-        n_days = len(json.loads(prog).get("weekly_split", [])) or 1
+        plan = _as_dict(prog)
+        n_days = len(plan.get("weekly_split", [])) or 1
         next_index = (day_index + 1) % n_days
         next_cycle_incr = 1 if next_index == 0 else 0
         await conn.execute(
@@ -791,7 +837,6 @@ async def finish_today(user_id: str, program_id: str, day_index: int, session_rp
                 sets_by_ex.setdefault(s["exercise"], []).append(dict(s))
                 if s["is_pr"]:
                     prs.append(s["exercise"])
-        plan = json.loads(prog)
         days = plan.get("weekly_split", [])
         if 0 <= day_index < len(days):
             day_label = days[day_index].get("day_label", day_label)
@@ -886,7 +931,7 @@ async def save_push_subscription(user_id: str, subscription: dict) -> None:
     async with pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO push_subscriptions (user_id, endpoint, subscription)
-               VALUES ($1, $2, $3)
+               VALUES ($1, $2, $3::jsonb)
                ON CONFLICT (endpoint) DO UPDATE SET subscription = EXCLUDED.subscription""",
             user_id, subscription["endpoint"], json.dumps(subscription),
         )
@@ -898,7 +943,7 @@ async def list_push_subscriptions(user_id: str) -> list[dict]:
         rows = await conn.fetch(
             "SELECT subscription FROM push_subscriptions WHERE user_id = $1", user_id
         )
-    return [json.loads(r["subscription"]) for r in rows]
+    return [_as_dict(r["subscription"]) for r in rows]
 
 
 async def remove_push_subscription(endpoint: str) -> None:
@@ -1035,7 +1080,7 @@ async def get_progress(user_id: str, days: int = 90) -> dict:
     bodyweight = []
     readiness = []
     for r in readiness_rows:
-        data = json.loads(r["readiness"]) if isinstance(r["readiness"], str) else dict(r["readiness"])
+        data = _as_dict(r["readiness"])
         day = str(r["for_date"])
         if isinstance(data.get("bodyweight_lbs"), (int, float)):
             bodyweight.append({"date": day, "lbs": float(data["bodyweight_lbs"])})

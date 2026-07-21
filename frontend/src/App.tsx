@@ -379,7 +379,10 @@ export default function App() {
           if (!line.startsWith("data: ")) continue;
           const ev = JSON.parse(line.slice(6));
           if (ev.type === "token" || ev.type === "error") {
-            const add = ev.type === "error" ? `⚠ ${ev.text}` : ev.text;
+            const add =
+              ev.type === "error"
+                ? `⚠ ${ev.text}\n\nChat needs the coach API. You can still open Plans → Start this plan — that works without chat.`
+                : ev.text;
             setMsgs((m) => {
               const copy = [...m];
               copy[copy.length - 1] = {
@@ -389,8 +392,12 @@ export default function App() {
               return copy;
             });
           }
-          if (ev.type === "done" && ev.chat_id) {
-            if (!chatId) setChatId(ev.chat_id);
+          if (ev.type === "done") {
+            if (ev.chat_id && !chatId) setChatId(ev.chat_id);
+            if (ev.program_id) {
+              setView("today");
+              refreshDash();
+            }
             api("/api/chats").then((r) => {
               if (r.ok) r.json().then(setChats);
             });
@@ -398,7 +405,13 @@ export default function App() {
         }
       }
     } catch {
-      setMsgs((m) => [...m.slice(0, -1), { role: "assistant", text: "⚠ backend unreachable" }]);
+      setMsgs((m) => [
+        ...m.slice(0, -1),
+        {
+          role: "assistant",
+          text: "⚠ Can't reach Coach K right now. Open Plans and tap Start this plan — that doesn't need chat.",
+        },
+      ]);
     } finally {
       setBusy(false);
       refreshDash();
