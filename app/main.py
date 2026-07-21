@@ -141,7 +141,16 @@ async def chat(body: ChatIn, request: Request):
             if not sent_any and final_text:
                 yield f"data: {json.dumps({'type': 'token', 'text': final_text})}\n\n"
         except Exception as e:  # surface upstream failures (API, DB) to the client
-            yield f"data: {json.dumps({'type': 'error', 'text': str(e)[:300]})}\n\n"
+            err = str(e)
+            low = err.lower()
+            if "connection" in low or "api_key" in low or "authentication" in low:
+                err = (
+                    f"{err[:180]} — Coach chat can't reach the model API. "
+                    "Your Plans → Start this plan button still works without chat."
+                )
+            else:
+                err = err[:300]
+            yield f"data: {json.dumps({'type': 'error', 'text': err})}\n\n"
         done = {"type": "done", "chat_id": chat_id}
         if program_id:
             done["program_id"] = program_id

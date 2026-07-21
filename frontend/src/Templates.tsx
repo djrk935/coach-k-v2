@@ -44,23 +44,34 @@ export default function Templates({
 
   const shown = templates.filter((t) => goal === "all" || t.goal === goal);
 
-  async function startPlan(id: string) {
+  async function startPlan(id: string, thenPersonalize = false) {
     setActivating(true);
     setActivateMsg("");
-    const r = await api("/api/templates/activate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template_id: id }),
-    });
-    setActivating(false);
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      setActivateMsg(typeof d.detail === "string" ? d.detail : "Couldn't activate plan");
-      return;
+    try {
+      const r = await api("/api/templates/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: id }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setActivateMsg(typeof d.detail === "string" ? d.detail : "Couldn't activate plan");
+        return false;
+      }
+      const data = await r.json();
+      setActivateMsg(`Active: ${data.name}`);
+      if (thenPersonalize && open) {
+        onPersonalize(open.name);
+      } else {
+        onActivated?.();
+      }
+      return true;
+    } catch {
+      setActivateMsg("Couldn't reach the server — try again.");
+      return false;
+    } finally {
+      setActivating(false);
     }
-    const data = await r.json();
-    setActivateMsg(`Active: ${data.name}`);
-    onActivated?.();
   }
 
   if (open) {
@@ -84,13 +95,21 @@ export default function Templates({
             {activating ? "Starting…" : "Start this plan"}
           </button>
           <button
-            onClick={() => onPersonalize(open.name)}
+            onClick={() => startPlan(open.id, true)}
+            disabled={activating}
             className="ck-btn ck-btn-ghost"
           >
-            Personalize with Coach K
+            Start + personalize
           </button>
         </div>
-        {activateMsg && <p className="mt-3 text-sm text-emerald-700">{activateMsg}</p>}
+        <p className="mt-2 text-[11px] text-mut">
+          Start loads Today immediately (no chat required). Personalize opens Coach K after the plan is active.
+        </p>
+        {activateMsg && (
+          <p className={`mt-3 text-sm ${activateMsg.startsWith("Active") ? "text-emerald-700" : "text-brand"}`}>
+            {activateMsg}
+          </p>
+        )}
         <div className="mt-6 space-y-6">
           {open.days.map((d) => (
             <section key={d.label} className="ck-surface p-4">
@@ -131,7 +150,7 @@ export default function Templates({
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-fg-dim">
             Book-inspired starting points. Tap a plan, then <strong className="text-white">Start this plan</strong> to
-            train today — or ask Coach K to personalize it.
+            train today — or <strong className="text-white">Start + personalize</strong> to activate first, then chat.
           </p>
         </div>
       </div>
