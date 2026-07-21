@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, LoggedSet, TodayExercise, TodayPlan } from "./api";
+import RestTimer from "./RestTimer";
 import { FlipImage } from "./Templates";
 
 function parseRepTarget(reps: string): number | undefined {
@@ -56,7 +57,7 @@ function ExerciseCard({
   }
 
   return (
-    <div className="rounded-xl border border-line bg-panel p-3 sm:p-4">
+    <div className="ck-surface p-3 sm:p-4">
       <div className="flex items-start gap-3">
         <FlipImage urls={ex.image_urls} size={44} />
         <div className="min-w-0 flex-1">
@@ -69,14 +70,14 @@ function ExerciseCard({
             <p className="truncate font-bold">{ex.exercise}</p>
             {ex.swapped && <span className="shrink-0 text-[10px] text-brand">swap</span>}
             {ex.adapted && <span className="shrink-0 text-[10px] text-amber-400">adapted</span>}
-            {lastPr && <span className="shrink-0 text-xs text-brand">PR</span>}
+            {lastPr && <span className="shrink-0 text-xs font-bold text-brand">PR</span>}
           </div>
           <p className="text-xs text-mut">
             {target} × {ex.reps} · {ex.intensity}
             {ex.notes ? ` · ${ex.notes}` : ""}
           </p>
           {ex.form_cue && (
-            <p className="mt-1 text-[11px] leading-snug text-white/55">{ex.form_cue}</p>
+            <p className="mt-1 text-[11px] leading-snug text-fg-dim/80">{ex.form_cue}</p>
           )}
           {ex.progression && (
             <p className="mt-1 text-[11px] text-emerald-400">{ex.progression.reason}</p>
@@ -129,9 +130,9 @@ function ExerciseCard({
         <button
           onClick={logSet}
           disabled={busy || done >= target}
-          className="min-w-0 flex-1 rounded-lg bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+          className="ck-btn ck-btn-primary min-w-0 flex-1 py-2.5"
         >
-          {done >= target ? "✓ Done" : "Log Set"}
+          {done >= target ? "Done" : "Log Set"}
         </button>
       </div>
     </div>
@@ -204,6 +205,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
   const [debrief, setDebrief] = useState<TodayPlan["debrief"] | null>(null);
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
+  const [restFor, setRestFor] = useState<number | null>(null);
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
 
   const load = () =>
@@ -232,7 +234,12 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
         exercise, weight_lbs: weight, reps, rir,
       }),
     });
-    if (r.ok) await load();
+    if (r.ok) {
+      const ex = plan.exercises[slot];
+      const rest = typeof ex?.rest_s === "number" && ex.rest_s > 0 ? ex.rest_s : 90;
+      setRestFor(rest);
+      await load();
+    }
   }
 
   async function swap(slot: number, newExercise: string) {
@@ -455,10 +462,18 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
 
       <button
         onClick={finishWorkout}
-        className="mt-5 w-full rounded-xl bg-brand py-3 font-bold text-white"
+        className="ck-btn ck-btn-primary mt-5 w-full py-3"
       >
-        {allDone ? "Finish Workout ✓" : "Finish Workout Anyway"}
+        {allDone ? "Finish Workout" : "Finish Workout Anyway"}
       </button>
+
+      {restFor != null && (
+        <RestTimer
+          seconds={restFor}
+          onDone={() => setRestFor(null)}
+          onDismiss={() => setRestFor(null)}
+        />
+      )}
     </div>
   );
 }

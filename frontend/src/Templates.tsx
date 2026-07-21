@@ -21,10 +21,18 @@ export function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }
   );
 }
 
-export default function Templates({ onPersonalize }: { onPersonalize: (name: string) => void }) {
+export default function Templates({
+  onPersonalize,
+  onActivated,
+}: {
+  onPersonalize: (name: string) => void;
+  onActivated?: () => void;
+}) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [goal, setGoal] = useState<(typeof GOALS)[number]>("all");
   const [open, setOpen] = useState<Template | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [activateMsg, setActivateMsg] = useState("");
 
   useEffect(() => {
     api("/api/templates")
@@ -36,27 +44,56 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
 
   const shown = templates.filter((t) => goal === "all" || t.goal === goal);
 
+  async function startPlan(id: string) {
+    setActivating(true);
+    setActivateMsg("");
+    const r = await api("/api/templates/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: id }),
+    });
+    setActivating(false);
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setActivateMsg(typeof d.detail === "string" ? d.detail : "Couldn't activate plan");
+      return;
+    }
+    const data = await r.json();
+    setActivateMsg(`Active: ${data.name}`);
+    onActivated?.();
+  }
+
   if (open) {
     return (
       <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-white">
           ← All plans
         </button>
-        <p className="font-display text-xs font-semibold tracking-[0.25em] text-brand">
+        <p className="ck-eyebrow">
           {(open.source_type || "book").toUpperCase()} · {open.days_per_week} DAYS/WK
         </p>
         <h2 className="mt-2 font-display text-xl font-black tracking-tight sm:text-2xl">{open.name}</h2>
         <p className="mt-2 text-sm leading-relaxed text-mut">{open.summary}</p>
         <p className="mt-2 text-xs leading-relaxed text-brand">{open.based_on}</p>
-        <button
-          onClick={() => onPersonalize(open.name)}
-          className="mt-5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white"
-        >
-          Have Coach K personalize this →
-        </button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            onClick={() => startPlan(open.id)}
+            disabled={activating}
+            className="ck-btn ck-btn-primary"
+          >
+            {activating ? "Starting…" : "Start this plan"}
+          </button>
+          <button
+            onClick={() => onPersonalize(open.name)}
+            className="ck-btn ck-btn-ghost"
+          >
+            Personalize with Coach K
+          </button>
+        </div>
+        {activateMsg && <p className="mt-3 text-sm text-emerald-400">{activateMsg}</p>}
         <div className="mt-6 space-y-6">
           {open.days.map((d) => (
-            <section key={d.label} className="rounded-xl border border-line/70 bg-panel p-4">
+            <section key={d.label} className="ck-surface p-4">
               <h3 className="mb-3 font-display font-bold">{d.label}</h3>
               <ul className="space-y-3">
                 {d.exercises.map((ex: TemplateEx) => (
@@ -88,14 +125,13 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
         />
         <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
         <div className="relative px-5 py-8 sm:px-7 sm:py-10">
-          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">LIBRARY</p>
+          <p className="ck-eyebrow">Library</p>
           <h2 className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">
             Pre-Made Plans
           </h2>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/70">
-            Book-inspired and coach-tested starting points — Starting Strength lineage, Prilepin
-            zones, Helms volume landmarks, Jump Attack athleticism, PPL, and more. Pick one;
-            Coach K personalizes it to your 1RMs and readiness.
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-fg-dim">
+            Book-inspired starting points. Tap a plan, then <strong className="text-white">Start this plan</strong> to
+            train today — or ask Coach K to personalize it.
           </p>
         </div>
       </div>
@@ -118,7 +154,7 @@ export default function Templates({ onPersonalize }: { onPersonalize: (name: str
           <button
             key={t.id}
             onClick={() => setOpen(t)}
-            className="rounded-xl border border-line bg-panel/80 p-4 text-left transition hover:border-brand"
+            className="ck-surface p-4 text-left transition hover:border-brand"
           >
             <p className="font-display font-bold">{t.name}</p>
             <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-brand">

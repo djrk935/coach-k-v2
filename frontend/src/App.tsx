@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
+import Onboarding from "./Onboarding";
 import Settings from "./Settings";
 import Templates from "./Templates";
 import Today from "./Today";
@@ -28,20 +29,21 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/45" />
+      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/88 to-ink/40" />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink/70 via-transparent to-transparent" />
       <div className="relative w-full max-w-md px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 sm:px-6 sm:pb-10">
-        <p className="animate-rise font-display text-xs font-semibold tracking-[0.4em] text-brand">
-          COACH K
-        </p>
-        <h1 className="animate-rise mt-3 font-display text-4xl font-black leading-none tracking-tight delay-75 sm:text-5xl">
+        <p className="animate-rise ck-mark text-sm">COACH K</p>
+        <h1 className="animate-rise mt-4 font-display text-4xl font-black leading-[0.95] tracking-tight delay-75 sm:text-5xl">
           Train with a coach who shows up.
         </h1>
-        <p className="animate-rise mt-4 max-w-sm text-sm leading-relaxed text-white/70 delay-150">
-          Dayan Kijege — from the DRC to Austin. Athlete, coach, and builder. Science-grounded
-          programming with honest feedback.
+        <p className="animate-rise mt-4 max-w-sm text-[15px] leading-relaxed text-fg-dim delay-150">
+          Dayan Kijege — from the DRC to Austin. Science-grounded programming. Honest feedback.
+          Workouts that adapt to you.
         </p>
-        <div className="animate-rise mt-8 rounded-2xl border border-line/80 bg-panel/90 p-5 backdrop-blur-sm delay-200">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-mut">Enter to continue</p>
+        <div className="animate-rise ck-surface-elevated mt-8 p-5 backdrop-blur-md delay-200">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
+            Enter to continue
+          </p>
           <input
             type="password"
             value={pw}
@@ -54,7 +56,7 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             }}
             placeholder="Password"
             autoFocus
-            className="w-full rounded-xl border border-line bg-ink px-3 py-3 outline-none focus:border-brand"
+            className="ck-field"
           />
         </div>
       </div>
@@ -222,6 +224,7 @@ export default function App() {
   const [view, setView] = useState<"today" | "chat" | "templates" | "about">("today");
   const [showSettings, setShowSettings] = useState(false);
   const [showDash, setShowDash] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -230,7 +233,12 @@ export default function App() {
     api("/api/dashboard")
       .then((r) => {
         if (r.status === 401) setLocked(true);
-        else return r.json().then(setDash);
+        else return r.json().then((d: Dashboard) => {
+          setDash(d);
+          const profile = (d.profile || {}) as Record<string, unknown>;
+          const localDone = localStorage.getItem("coachk_onboarded") === "1";
+          if (!profile.onboarded && !localDone) setShowOnboarding(true);
+        });
       })
       .catch(() => {});
 
@@ -351,16 +359,28 @@ export default function App() {
     );
   }
 
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        onComplete={() => {
+          setShowOnboarding(false);
+          setView("today");
+          refreshDash();
+        }}
+      />
+    );
+  }
+
   const profile = (dash?.profile ?? {}) as Record<string, unknown>;
 
   return (
     <div className="flex h-full min-h-0">
       {/* ===== Main column ===== */}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-line/80 bg-ink/60 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3">
+        <header className="flex flex-wrap items-center gap-2 border-b border-line/70 bg-ink/55 px-3 py-2.5 pt-[calc(0.55rem+env(safe-area-inset-top))] backdrop-blur-xl sm:gap-3 sm:px-5 sm:py-3">
           <button
             onClick={() => setView("about")}
-            className="font-display text-sm font-extrabold tracking-[0.25em] text-brand transition hover:brightness-110 sm:text-base sm:tracking-[0.3em]"
+            className="ck-mark text-[13px] transition hover:brightness-110 sm:text-sm"
             title="About Coach K"
           >
             COACH K
@@ -432,6 +452,10 @@ export default function App() {
               setInput(
                 `Personalize the "${name}" template for me — adapt it to my profile, 1RMs, and readiness, then generate the program.`,
               );
+            }}
+            onActivated={() => {
+              setView("today");
+              refreshDash();
             }}
           />
         ) : view === "about" ? (

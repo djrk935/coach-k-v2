@@ -409,6 +409,94 @@ async def templates():
     return out
 
 
+class ActivateTemplateIn(BaseModel):
+    template_id: str
+
+
+@app.post("/api/templates/activate")
+async def activate_template(body: ActivateTemplateIn):
+    """One-tap: turn a gallery plan into the athlete's active program."""
+    from app.plan_activate import get_template, suggest_nutrition, template_to_workout_plan
+
+    user_id = await tools.get_or_create_user()
+    t = get_template(body.template_id)
+    if not t:
+        raise HTTPException(404, "template not found")
+    profile = await tools.get_latest_profile(user_id)
+    plan = template_to_workout_plan(t, profile.get("name"))
+    bw = profile.get("bodyweight_lbs")
+    nutrition = suggest_nutrition(float(bw) if bw else None, t["goal"])
+    if nutrition:
+        plan.nutrition = nutrition
+        await tools.apply_profile_patch(user_id, {
+            "nutrition_targets": nutrition.model_dump(),
+            "goal_mode": t["goal"] if t["goal"] != "general" else profile.get("goal_mode"),
+        })
+    # Drop the placeholder citation so PDF/UI don't claim a fake chunk_id
+    plan.citations = []
+    pid = await tools.save_program(user_id, plan)
+    # Reset progress to day 0 for the new program
+    await tools.get_or_init_progress(user_id, pid)
+    return {"ok": True, "program_id": pid, "name": plan.program_name}
+
+
+class OnboardingIn(BaseModel):
+    name: str
+    goal_mode: str = "general"
+    schedule: str | None = None
+    equipment: str | None = None
+    bodyweight_lbs: float | None = None
+    lifts_1rm: dict | None = None
+    template_id: str | None = None
+
+
+@app.post("/api/onboarding")
+async def onboarding(body: OnboardingIn):
+    """First-run setup: profile + optional starter plan activation."""
+    from app.plan_activate import get_template, suggest_nutrition, template_to_workout_plan
+
+    user_id = await tools.get_or_create_user()
+    patch: dict = {
+        "name": body.name.strip(),
+        "goal_mode": body.goal_mode,
+        "onboarded": True,
+        "onboarded_at": __import__("datetime").date.today().isoformat(),
+    }
+    if body.schedule:
+        patch["schedule"] = body.schedule
+    if body.equipment:
+        patch["equipment"] = body.equipment
+    if body.bodyweight_lbs:
+        patch["bodyweight_lbs"] = body.bodyweight_lbs
+    if body.lifts_1rm:
+        patch["lifts_1rm"] = {k: float(v) for k, v in body.lifts_1rm.items() if v}
+    goals_map = {
+        "athleticism": "Athleticism — power, vertical, court transfer",
+        "strength": "Get stronger on the big lifts",
+        "hypertrophy": "Build muscle with honest volume",
+        "recomposition": "Get stronger and sharper",
+        "general": "Stay capable and consistent",
+    }
+    patch["goals"] = goals_map.get(body.goal_mode, body.goal_mode)
+    await tools.apply_profile_patch(user_id, patch, updated_by="onboarding")
+
+    program_id = None
+    if body.template_id:
+        t = get_template(body.template_id)
+        if not t:
+            raise HTTPException(404, "template not found")
+        plan = template_to_workout_plan(t, body.name.strip())
+        nutrition = suggest_nutrition(body.bodyweight_lbs, body.goal_mode)
+        if nutrition:
+            plan.nutrition = nutrition
+            await tools.apply_profile_patch(user_id, {"nutrition_targets": nutrition.model_dump()})
+        plan.citations = []
+        program_id = await tools.save_program(user_id, plan)
+        await tools.get_or_init_progress(user_id, program_id)
+
+    return {"ok": True, "program_id": program_id}
+
+
 class IngestIn(BaseModel):
     path: str
     title: str
