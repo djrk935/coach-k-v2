@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ChatMeta, Dashboard, fileToDataUrl, keyed, Msg } from "./api";
 import About from "./About";
 import Calendar from "./Calendar";
+import OfflineBanner from "./OfflineBanner";
 import Onboarding from "./Onboarding";
 import Progress from "./Progress";
 import Settings from "./Settings";
@@ -376,7 +377,9 @@ export default function App() {
   const profile = (dash?.profile ?? {}) as Record<string, unknown>;
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
+      <OfflineBanner />
+      <div className="flex min-h-0 flex-1">
       {/* ===== Main column ===== */}
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-2 border-b border-line/70 bg-ink/55 px-3 py-2.5 pt-[calc(0.55rem+env(safe-area-inset-top))] backdrop-blur-xl sm:gap-3 sm:px-5 sm:py-3">
@@ -573,6 +576,7 @@ export default function App() {
       <aside className="hidden w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-line p-5 lg:flex">
         <DashPanels dash={dash} />
       </aside>
+      </div>
 
       {/* ===== Phone/tablet stats drawer ===== */}
       {showDash && (

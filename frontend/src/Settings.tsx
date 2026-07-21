@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, enablePush } from "./api";
+import {
+  canPromptInstall,
+  isIosSafari,
+  isStandalone,
+  promptInstall,
+  subscribePwaInstall,
+} from "./pwaInstall";
 
 type Props = {
   profile: Record<string, unknown>;
@@ -27,6 +34,12 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
       ? "Notifications are on."
       : "",
   );
+  const [installReady, setInstallReady] = useState(canPromptInstall());
+  const [installMsg, setInstallMsg] = useState("");
+  const standalone = isStandalone();
+  const iosHint = isIosSafari() && !standalone;
+
+  useEffect(() => subscribePwaInstall(() => setInstallReady(canPromptInstall())), []);
 
   async function handleEnablePush() {
     const result = await enablePush();
@@ -38,6 +51,18 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
         unconfigured: "Push isn't configured on this server yet.",
       }[result],
     );
+  }
+
+  async function handleInstall() {
+    const outcome = await promptInstall();
+    if (outcome === "accepted") {
+      setInstallMsg("Installed — open Coach K from your home screen.");
+      setInstallReady(false);
+    } else if (outcome === "dismissed") {
+      setInstallMsg("Install dismissed — you can try again anytime.");
+    } else {
+      setInstallMsg("Install isn't available in this browser yet.");
+    }
   }
 
   async function save() {
@@ -88,6 +113,37 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
           <h2 className="font-display text-lg font-black">Settings</h2>
           <button onClick={onClose} className="text-mut hover:text-white">✕</button>
         </div>
+
+        <section className="mb-5 rounded-xl border border-line p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-mut">
+            App &amp; offline
+          </h3>
+          <p className="mb-2 text-xs text-mut">
+            Install Coach K on your home screen. The shell and exercise images stay available offline;
+            live coaching still needs a connection.
+          </p>
+          {standalone ? (
+            <p className="text-xs font-semibold text-emerald-400">Running as an installed app.</p>
+          ) : installReady ? (
+            <button
+              type="button"
+              onClick={handleInstall}
+              className="w-full rounded-lg bg-brand py-2 text-sm font-semibold text-white"
+            >
+              Install Coach K
+            </button>
+          ) : iosHint ? (
+            <p className="text-xs text-mut">
+              On iPhone: tap <span className="font-semibold text-white">Share</span>, then{" "}
+              <span className="font-semibold text-white">Add to Home Screen</span>.
+            </p>
+          ) : (
+            <p className="text-xs text-mut">
+              Use your browser&apos;s install / Add to Home Screen option if available.
+            </p>
+          )}
+          {installMsg && <p className="mt-2 text-xs text-mut">{installMsg}</p>}
+        </section>
 
         <section className="mb-5 rounded-xl border border-line p-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-mut">

@@ -2,8 +2,11 @@
   "name": "Coach K",
   "short_name": "Coach K",
   "description": "Science-grounded personal strength coaching by Dayan Kijege",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "icons": [
