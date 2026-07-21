@@ -241,7 +241,8 @@ function ExerciseCard({
           onChange={(e) => setWeight(e.target.value)}
           inputMode="decimal"
           placeholder="lbs"
-          className="ck-field w-16 shrink-0 py-2.5 text-center text-sm sm:w-20"
+          aria-label="Weight in pounds"
+          className="h-11 w-16 shrink-0 border-[1.5px] border-line bg-panel px-1.5 text-center text-base text-fg outline-none focus:border-brand sm:w-20"
         />
         <span className="shrink-0 text-mut">×</span>
         <input
@@ -249,12 +250,13 @@ function ExerciseCard({
           onChange={(e) => setReps(e.target.value)}
           inputMode="numeric"
           placeholder="reps"
-          className="ck-field w-14 shrink-0 py-2.5 text-center text-sm sm:w-16"
+          aria-label="Reps"
+          className="h-11 w-14 shrink-0 border-[1.5px] border-line bg-panel px-1.5 text-center text-base text-fg outline-none focus:border-brand sm:w-16"
         />
         <button
           onClick={logSet}
           disabled={busy || done >= target}
-          className="ck-btn ck-btn-primary min-w-0 flex-1 py-2.5"
+          className="ck-btn ck-btn-primary min-w-0 flex-1"
         >
           {done >= target ? "Done" : "Log Set"}
         </button>
