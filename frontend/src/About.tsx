@@ -25,9 +25,7 @@ export default function About({ onTalk }: { onTalk: () => void }) {
         <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-transparent to-transparent" />
 
         <div className="relative flex min-h-[70vh] flex-col justify-end px-5 pb-10 pt-24 sm:min-h-[78vh] sm:px-10 sm:pb-14">
-          <p className="animate-rise font-display text-xs font-semibold tracking-[0.35em] text-brand">
-            COACH K
-          </p>
+          <p className="animate-rise ck-mark text-sm">COACH K</p>
           <h1 className="animate-rise mt-3 max-w-xl font-display text-4xl font-black leading-[1.05] tracking-tight text-white delay-75 sm:text-6xl">
             Dayan Kijege
           </h1>
