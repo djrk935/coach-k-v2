@@ -50,7 +50,7 @@ def apply_migrations(database_url: str) -> list[str]:
                 continue
             sql = path.read_text()
             with conn.transaction():
-                conn.run(sql)
+                conn.execute(sql)
                 conn.execute(
                     "INSERT INTO schema_migrations (filename) VALUES (%s)",
                     (path.name,),
