@@ -115,10 +115,10 @@ export default function Onboarding({ onComplete }: Props) {
   const progress = ((step + 1) / steps.length) * 100;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink">
-      <div className="pointer-events-none absolute inset-0">
-        <img src="/images/hero-barbell.jpg" alt="" className="h-full w-full object-cover opacity-25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/90 to-ink/55" />
+    <div className="fixed inset-0 z-50 flex flex-col bg-paper">
+      <div className="pointer-events-none absolute inset-0 opacity-20">
+        <img src="/images/hero-barbell.jpg" alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-paper via-paper/90 to-paper/70" />
       </div>
 
       <header className="relative z-10 px-5 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-8">
@@ -128,9 +128,9 @@ export default function Onboarding({ onComplete }: Props) {
             {step + 1} / {steps.length}
           </span>
         </div>
-        <div className="mx-auto mt-4 h-1 max-w-lg overflow-hidden rounded-full bg-line">
+        <div className="mx-auto mt-4 h-1 max-w-lg overflow-hidden bg-line">
           <div
-            className="h-full rounded-full bg-brand transition-all duration-500"
+            className="h-full bg-brand transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -173,10 +173,10 @@ export default function Onboarding({ onComplete }: Props) {
                   key={g.id}
                   type="button"
                   onClick={() => setGoalMode(g.id)}
-                  className={`rounded-xl border px-4 py-3.5 text-left transition ${
+                  className={`border px-4 py-3.5 text-left transition ${
                     goalMode === g.id
-                      ? "border-brand bg-brand/15"
-                      : "border-line bg-panel/60 hover:border-brand/50"
+                      ? "border-brand bg-brand/5"
+                      : "border-line bg-panel hover:border-brand"
                   }`}
                 >
                   <span className="font-display font-bold">{g.label}</span>
@@ -199,10 +199,10 @@ export default function Onboarding({ onComplete }: Props) {
                   key={s.id}
                   type="button"
                   onClick={() => setSchedule(s.id)}
-                  className={`rounded-xl border px-4 py-4 text-left font-semibold transition ${
+                  className={`border px-4 py-4 text-left font-semibold transition ${
                     schedule === s.id
-                      ? "border-brand bg-brand/15"
-                      : "border-line bg-panel/60 hover:border-brand/50"
+                      ? "border-brand bg-brand/5"
+                      : "border-line bg-panel hover:border-brand"
                   }`}
                 >
                   {s.id}
@@ -224,10 +224,10 @@ export default function Onboarding({ onComplete }: Props) {
                   key={e}
                   type="button"
                   onClick={() => setEquipment(e)}
-                  className={`rounded-xl border px-4 py-3.5 text-left font-semibold transition ${
+                  className={`border px-4 py-3.5 text-left font-semibold transition ${
                     equipment === e
-                      ? "border-brand bg-brand/15"
-                      : "border-line bg-panel/60 hover:border-brand/50"
+                      ? "border-brand bg-brand/5"
+                      : "border-line bg-panel hover:border-brand"
                   }`}
                 >
                   {e}
@@ -292,10 +292,10 @@ export default function Onboarding({ onComplete }: Props) {
                   key={t.id}
                   type="button"
                   onClick={() => setPickedPlan(t.id)}
-                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                  className={`w-full border px-4 py-3 text-left transition ${
                     pickedPlan === t.id
-                      ? "border-brand bg-brand/15"
-                      : "border-line bg-panel/60 hover:border-brand/50"
+                      ? "border-brand bg-brand/5"
+                      : "border-line bg-panel hover:border-brand"
                   }`}
                 >
                   <span className="font-display font-bold">{t.name}</span>

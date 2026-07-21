@@ -7,6 +7,7 @@ export function CoachStorySections({ onCta }: { onCta: () => void }) {
     <>
       <section id="story" className="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
         <p className="ck-eyebrow">The story</p>
+        <span className="ck-signal-sm mt-3 max-w-[3rem]" />
         <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
           Built across languages, continents, and hard seasons.
         </h2>
@@ -31,10 +32,11 @@ export function CoachStorySections({ onCta }: { onCta: () => void }) {
               alt=""
               className="absolute inset-0 h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-ink/45" />
+            <div className="absolute inset-0 bg-brand/55" />
           </div>
-          <div className="relative flex flex-col justify-center bg-panel px-6 py-10 sm:px-10">
+          <div className="relative flex flex-col justify-center bg-paper px-6 py-10 sm:px-10">
             <p className="ck-eyebrow">On the court</p>
+            <span className="ck-signal-sm mt-3 max-w-[3rem]" />
             <h3 className="mt-3 font-display text-2xl font-black sm:text-3xl">
               6&apos;3&quot;. Basketball first. Athleticism always.
             </h3>
@@ -54,6 +56,7 @@ export function CoachStorySections({ onCta }: { onCta: () => void }) {
 
       <section id="philosophy" className="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
         <p className="ck-eyebrow">Philosophy</p>
+        <span className="ck-signal-sm mt-3 max-w-[3rem]" />
         <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
           Ambitious goals. Measurable work. No fluff.
         </h2>
@@ -69,9 +72,10 @@ export function CoachStorySections({ onCta }: { onCta: () => void }) {
         </p>
       </section>
 
-      <section className="border-t border-line/60 bg-panel/40">
+      <section className="border-t border-line bg-paper">
         <div className="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
           <p className="ck-eyebrow">With Coach K</p>
+          <span className="ck-signal-sm mt-3 max-w-[3rem]" />
           <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
             What working together looks like
           </h2>
@@ -94,7 +98,7 @@ export function CoachStorySections({ onCta }: { onCta: () => void }) {
                 body: "Same standard I bring to film sessions, volunteering, and enterprise IT work: prepare well, communicate clearly, and keep raising the bar.",
               },
             ].map((item) => (
-              <li key={item.title} className="border-l-2 border-brand/70 pl-4">
+              <li key={item.title} className="border-l-[3px] border-brand pl-4">
                 <h3 className="font-display text-lg font-bold">{item.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-mut sm:text-base">{item.body}</p>
               </li>

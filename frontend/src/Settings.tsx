@@ -95,14 +95,14 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
         value={form[key]}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-brand"
+        className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
       />
     </label>
   );
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/90 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
@@ -111,7 +111,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-black">Settings</h2>
-          <button onClick={onClose} className="text-mut hover:text-white">✕</button>
+          <button onClick={onClose} className="text-mut hover:text-brand">✕</button>
         </div>
 
         <section className="mb-5 rounded-xl border border-line p-3">
@@ -123,7 +123,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
             live coaching still needs a connection.
           </p>
           {standalone ? (
-            <p className="text-xs font-semibold text-emerald-400">Running as an installed app.</p>
+            <p className="text-xs font-semibold text-emerald-700">Running as an installed app.</p>
           ) : installReady ? (
             <button
               type="button"
@@ -174,7 +174,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
             <select
               value={form.goal_mode}
               onChange={(e) => setForm({ ...form, goal_mode: e.target.value })}
-              className="w-full rounded-lg border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
             >
               {GOAL_MODES.map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -193,7 +193,7 @@ export default function Settings({ profile, onClose, onSaved }: Props) {
                   value={form[l]}
                   onChange={(e) => setForm({ ...form, [l]: e.target.value })}
                   placeholder={l}
-                  className="rounded-lg border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-brand"
+                  className="rounded-lg border border-line bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
                 />
               ))}
             </div>

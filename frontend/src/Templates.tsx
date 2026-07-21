@@ -10,7 +10,7 @@ export function FlipImage({ urls, size = 56 }: { urls: string[]; size?: number }
     const t = setInterval(() => setF((x) => 1 - x), 900);
     return () => clearInterval(t);
   }, [urls]);
-  if (!urls.length) return <div style={{ width: size, height: size }} className="shrink-0 rounded-lg bg-ink" />;
+  if (!urls.length) return <div style={{ width: size, height: size }} className="shrink-0 border border-line bg-paper" />;
   return (
     <img
       src={urls[f] ?? urls[0]}
@@ -66,7 +66,7 @@ export default function Templates({
   if (open) {
     return (
       <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-        <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-white">
+        <button onClick={() => setOpen(null)} className="mb-4 text-sm text-mut hover:text-brand">
           ← All plans
         </button>
         <p className="ck-eyebrow">
@@ -90,7 +90,7 @@ export default function Templates({
             Personalize with Coach K
           </button>
         </div>
-        {activateMsg && <p className="mt-3 text-sm text-emerald-400">{activateMsg}</p>}
+        {activateMsg && <p className="mt-3 text-sm text-emerald-700">{activateMsg}</p>}
         <div className="mt-6 space-y-6">
           {open.days.map((d) => (
             <section key={d.label} className="ck-surface p-4">
@@ -123,7 +123,7 @@ export default function Templates({
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-35"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand via-brand/75 to-ink/40" />
         <div className="relative px-5 py-8 sm:px-7 sm:py-10">
           <p className="ck-eyebrow">Library</p>
           <h2 className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">
@@ -141,7 +141,7 @@ export default function Templates({
             key={g}
             onClick={() => setGoal(g)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
-              goal === g ? "bg-brand text-white" : "border border-line bg-panel text-mut hover:text-white"
+              goal === g ? "bg-brand text-white" : "border border-line bg-panel text-mut hover:text-brand"
             }`}
           >
             {g}
