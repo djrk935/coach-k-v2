@@ -210,7 +210,11 @@ async def today(travel: str | None = None):
             ex["image_urls"] = m["image_urls"] if m else []
             ex["form_cue"] = form_cue_for(ex["exercise"])
         return day
-    day = await tools.get_today(user_id)
+    try:
+        day = await tools.get_today(user_id)
+    except Exception as e:
+        # Surface the real failure so Today isn't a silent empty state
+        raise HTTPException(500, f"today failed: {type(e).__name__}: {e}") from e
     if not day:
         return {"active": False}
     return {"active": True, **day}

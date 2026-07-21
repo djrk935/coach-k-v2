@@ -92,7 +92,10 @@ def _norm(s: str) -> str:
 
 @lru_cache(maxsize=1)
 def _catalog() -> list[dict]:
-    return json.loads((MEDIA_DIR / "exercises.json").read_text())
+    path = MEDIA_DIR / "exercises.json"
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
 
 
 @lru_cache(maxsize=1)
@@ -137,7 +140,10 @@ def resolve(name: str) -> dict | None:
 
 def media_for(name: str) -> dict | None:
     """{matched, image_paths, image_urls, instructions} for the UI/PDF, or None."""
-    ex = resolve(name)
+    try:
+        ex = resolve(name)
+    except Exception:
+        return None
     if not ex:
         return None
     imgs = [MEDIA_DIR / "images" / p for p in ex["images"]]
