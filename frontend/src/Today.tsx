@@ -119,20 +119,26 @@ function ExerciseCard({
     }
   }
 
+  const loadLabel =
+    ex.suggested_weight_lbs != null ? `${ex.suggested_weight_lbs}` : "—";
+
   return (
-    <div className="ck-surface p-3 sm:p-4">
-      <div className="flex items-start gap-3">
-        <FlipImage urls={ex.image_urls} size={44} />
+    <div className="ck-row flex-col gap-3 sm:flex-row sm:items-start" style={{ animationDelay: `${slot * 30}ms` }}>
+      <div className="flex w-full min-w-0 items-start gap-3">
+        <span className="w-7 shrink-0 font-display text-xs font-bold tabular-nums text-mut">
+          {String(slot + 1).padStart(2, "0")}
+        </span>
+        <FlipImage urls={ex.image_urls} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             {ex.superset_group && (
-              <span className="shrink-0 rounded bg-brand px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+              <span className="shrink-0 bg-brand px-1.5 py-0.5 text-[10px] font-extrabold text-white">
                 {ex.superset_group}
               </span>
             )}
-            <p className="truncate font-bold">{ex.exercise}</p>
+            <p className="truncate font-display text-sm font-bold uppercase tracking-wide">{ex.exercise}</p>
             {ex.swapped && <span className="shrink-0 text-[10px] text-brand">swap</span>}
-            {ex.adapted && <span className="shrink-0 text-[10px] text-amber-400">adapted</span>}
+            {ex.adapted && <span className="shrink-0 text-[10px] text-amber-700">adapted</span>}
             {lastPr && <span className="shrink-0 text-xs font-bold text-brand">PR</span>}
           </div>
           <p className="text-xs text-mut">
@@ -140,10 +146,13 @@ function ExerciseCard({
             {ex.notes ? ` · ${ex.notes}` : ""}
           </p>
           {ex.form_cue && (
-            <p className="mt-1 text-[11px] leading-snug text-fg-dim/80">{ex.form_cue}</p>
+            <div className="ck-cue mt-2">
+              <p className="ck-cue-label">Coach cue</p>
+              <p className="mt-0.5 text-[12px] leading-snug">{ex.form_cue}</p>
+            </div>
           )}
           {ex.progression && (
-            <p className="mt-1 text-[11px] text-emerald-400">{ex.progression.reason}</p>
+            <p className="mt-1 text-[11px] text-emerald-700">{ex.progression.reason}</p>
           )}
           {ex.swap_suggestion && onSwap && (
             <button
@@ -154,13 +163,18 @@ function ExerciseCard({
             </button>
           )}
         </div>
-        <div className="shrink-0 text-right text-xs font-semibold text-mut">
-          {done}/{target} sets
+        <div className="shrink-0 text-right">
+          <p className="font-display text-xl font-black tabular-nums leading-none text-brand sm:text-2xl">
+            {loadLabel}
+          </p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-mut">
+            {done}/{target} sets
+          </p>
         </div>
       </div>
 
       {warmups.length > 0 && (
-        <div className="mt-3 rounded-xl border border-line/70 bg-ink/50 p-2.5">
+        <div className="mt-3 border border-line bg-paper p-2.5">
           <button
             type="button"
             onClick={() => setShowWarmup((s) => !s)}
@@ -178,10 +192,10 @@ function ExerciseCard({
                   key={`${w.label}-${i}`}
                   type="button"
                   onClick={() => loadWarmup(i)}
-                  className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                  className={`flex w-full items-center justify-between border px-2.5 py-2 text-left text-xs transition ${
                     warmupDone[i]
-                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                      : "border-line bg-panel/60 hover:border-brand"
+                      ? "border-emerald-600/40 bg-emerald-50 text-emerald-700"
+                      : "border-line bg-panel hover:border-brand"
                   }`}
                 >
                   <span className="font-medium tabular-nums">{w.label}</span>
@@ -193,7 +207,7 @@ function ExerciseCard({
               <button
                 type="button"
                 onClick={loadWorking}
-                className="flex w-full items-center justify-between rounded-lg border border-brand/40 bg-brand/10 px-2.5 py-2 text-left text-xs font-semibold text-brand"
+                className="flex w-full items-center justify-between border border-brand bg-brand/5 px-2.5 py-2 text-left text-xs font-semibold text-brand"
               >
                 <span>
                   Working set
@@ -211,8 +225,8 @@ function ExerciseCard({
           {ex.logged_sets.map((s: LoggedSet, i) => (
             <span
               key={i}
-              className={`rounded-lg px-2 py-0.5 text-xs ${
-                s.is_pr ? "bg-brand text-white" : "bg-ink text-mut"
+              className={`px-2 py-0.5 text-xs ${
+                s.is_pr ? "bg-brand text-white" : "border border-line text-mut"
               }`}
             >
               {s.weight_lbs ?? "—"}×{s.reps ?? "—"}
@@ -227,7 +241,7 @@ function ExerciseCard({
           onChange={(e) => setWeight(e.target.value)}
           inputMode="decimal"
           placeholder="lbs"
-          className="w-16 shrink-0 rounded-lg border border-line bg-ink px-1.5 py-2.5 text-center text-sm outline-none focus:border-brand sm:w-20 sm:px-2"
+          className="ck-field w-16 shrink-0 py-2.5 text-center text-sm sm:w-20"
         />
         <span className="shrink-0 text-mut">×</span>
         <input
@@ -235,7 +249,7 @@ function ExerciseCard({
           onChange={(e) => setReps(e.target.value)}
           inputMode="numeric"
           placeholder="reps"
-          className="w-14 shrink-0 rounded-lg border border-line bg-ink px-1.5 py-2.5 text-center text-sm outline-none focus:border-brand sm:w-16 sm:px-2"
+          className="ck-field w-14 shrink-0 py-2.5 text-center text-sm sm:w-16"
         />
         <button
           onClick={logSet}
@@ -263,14 +277,14 @@ function ExerciseCard({
         >
           {formBusy ? "Reading your set…" : "Check form (video)"}
         </button>
-        {formErr && <p className="mt-1.5 text-[11px] text-amber-300">{formErr}</p>}
+        {formErr && <p className="mt-1.5 text-[11px] text-brand">{formErr}</p>}
         {formResult && (
-          <div className="mt-2 rounded-xl border border-line/80 bg-ink/40 p-3 animate-rise">
+          <div className="mt-2 border border-line bg-paper p-3 animate-rise">
             <p className="ck-eyebrow">Form check</p>
             <p className="mt-1 text-sm leading-snug">{formResult.summary}</p>
             {formResult.looking_good?.length > 0 && (
               <div className="mt-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700/90">
                   Looking good
                 </p>
                 <ul className="mt-1 space-y-1 text-xs text-mut">
@@ -293,11 +307,11 @@ function ExerciseCard({
               </div>
             )}
             {formResult.safety_flags?.length > 0 && (
-              <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+              <div className="mt-2 border border-brand bg-brand/5 p-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">
                   Watch
                 </p>
-                <ul className="mt-1 space-y-1 text-xs text-amber-100/90">
+                <ul className="mt-1 space-y-1 text-xs text-fg-dim">
                   {formResult.safety_flags.map((f) => (
                     <li key={f}>· {f}</li>
                   ))}
@@ -326,30 +340,30 @@ function InjuryProtocolCard({
   onApply: (regionKey: string) => void;
 }) {
   return (
-    <div className="ck-surface mb-3 border border-amber-500/35 bg-amber-500/10 p-4">
-      <p className="ck-eyebrow">Injury protocol</p>
+    <div className="ck-cue mb-3">
+      <p className="ck-cue-label">Protocol</p>
       <p className="mt-1 font-display text-lg font-black tracking-tight">{protocol.region}</p>
       {protocol.volume_hint && (
-        <p className="mt-1 text-xs text-mut">{protocol.volume_hint}</p>
+        <p className="mt-1 text-xs text-white/80">{protocol.volume_hint}</p>
       )}
-      <ul className="mt-3 space-y-1.5 text-xs leading-snug text-fg-dim">
+      <ul className="mt-3 space-y-1.5 text-xs leading-snug text-white/90">
         {protocol.steps.map((step) => (
           <li key={step} className="flex gap-2">
-            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+            <span className="mt-1.5 h-1 w-1 shrink-0 bg-white" />
             <span>{step}</span>
           </li>
         ))}
       </ul>
       {protocol.alternatives.length > 0 && (
         <>
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-mut">
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-white/70">
             Prefer today
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {protocol.alternatives.map((alt) => (
               <span
                 key={alt}
-                className="rounded-lg border border-line/80 bg-ink/40 px-2 py-1 text-[11px] font-medium"
+                className="border border-white/40 px-2 py-1 text-[11px] font-medium"
               >
                 {alt}
               </span>
@@ -361,7 +375,7 @@ function InjuryProtocolCard({
         type="button"
         disabled={busy}
         onClick={() => onApply(protocol.region_key)}
-        className="ck-btn ck-btn-ghost mt-3 w-full py-2.5 text-xs"
+        className="ck-btn mt-3 w-full border border-white bg-white py-2.5 text-xs text-brand hover:bg-paper"
       >
         Apply suggested swaps
       </button>
@@ -399,7 +413,7 @@ function PainReport({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-[11px] font-semibold text-mut underline-offset-2 hover:text-white hover:underline"
+          className="text-[11px] font-semibold text-mut underline-offset-2 hover:text-brand hover:underline"
         >
           Something hurts? Flag a region
         </button>
@@ -410,7 +424,7 @@ function PainReport({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-[11px] text-mut hover:text-white"
+              className="text-[11px] text-mut hover:text-brand"
             >
               Cancel
             </button>
@@ -422,7 +436,7 @@ function PainReport({
                 type="button"
                 disabled={busy}
                 onClick={() => logRegion(o.key)}
-                className="rounded-lg border border-line bg-ink/50 px-2.5 py-1.5 text-[11px] font-semibold hover:border-brand disabled:opacity-40"
+                className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[11px] font-semibold hover:border-brand disabled:opacity-40"
               >
                 {o.label}
               </button>
@@ -463,8 +477,9 @@ function CheckinGate({
   }
 
   return (
-    <div className="mb-5 rounded-2xl border border-brand/40 bg-panel p-4">
+    <div className="mb-5 border border-brand bg-panel p-4">
       <p className="font-display text-xs font-semibold tracking-[0.25em] text-brand">CHECK-IN</p>
+      <span className="ck-signal-sm mt-2 max-w-[3rem]" />
       <p className="mt-1 text-sm text-mut">Quick readiness before you train — Coach K adapts the day.</p>
       <div className="mt-4 grid grid-cols-3 gap-2">
         {[
@@ -480,7 +495,7 @@ function CheckinGate({
               value={f.value}
               onChange={(e) => f.set(e.target.value)}
               inputMode="decimal"
-              className="w-full rounded-lg border border-line bg-ink px-2 py-2 text-center text-sm outline-none focus:border-brand"
+              className="ck-field py-2 text-center text-sm"
             />
           </label>
         ))}
@@ -488,7 +503,7 @@ function CheckinGate({
       <button
         onClick={submit}
         disabled={busy}
-        className="mt-4 w-full rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+        className="ck-btn ck-btn-primary mt-4 w-full disabled:opacity-40"
       >
         {busy ? "Saving…" : "Set today's plan"}
       </button>
@@ -635,16 +650,17 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-30"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/50" />
-        <div className="relative animate-rise">
-          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">TODAY</p>
-          <p className="mt-3 font-display text-2xl font-black tracking-tight">No active program yet.</p>
-          <p className="mt-2 max-w-sm text-sm text-mut">
+        <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/80 to-ink/45" />
+        <div className="relative animate-rise text-left">
+          <p className="font-display text-xs font-extrabold tracking-[0.32em] text-white">TODAY</p>
+          <span className="mt-3 block h-0.5 w-16 bg-white" />
+          <p className="mt-4 font-display text-2xl font-black tracking-tight text-white">No active program yet.</p>
+          <p className="mt-2 max-w-sm text-sm text-white/85">
             Pick a book-inspired plan or ask Coach K to build one around your goals.
           </p>
           <button
             onClick={onGoToTemplates}
-            className="mt-6 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+            className="ck-btn mt-6 bg-white text-brand hover:bg-paper"
           >
             Browse Plans →
           </button>
@@ -661,14 +677,15 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-25"
         />
-        <div className="absolute inset-0 bg-ink/80" />
-        <div className="relative animate-rise max-w-md">
-          <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">SESSION</p>
-          <p className="mt-3 font-display text-2xl font-black tracking-tight">
+        <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/85 to-ink/50" />
+        <div className="relative animate-rise max-w-md text-left">
+          <p className="font-display text-xs font-extrabold tracking-[0.32em] text-white">SESSION</p>
+          <span className="mt-3 block h-0.5 w-16 bg-white" />
+          <p className="mt-4 font-display text-2xl font-black tracking-tight text-white">
             {debrief?.headline ?? "Day complete — nice work."}
           </p>
           {debrief?.message && (
-            <p className="mt-4 whitespace-pre-line text-left text-sm leading-relaxed text-white/75">
+            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/90">
               {debrief.message.replace(/\*\*/g, "")}
             </p>
           )}
@@ -725,7 +742,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
       {needsCheckin && <CheckinGate onDone={load} />}
 
       {plan.catch_up && (
-        <div className="mb-4 rounded-xl border border-line bg-panel p-4">
+        <div className="mb-4 border border-line bg-panel p-4">
           <p className="text-sm font-semibold">{plan.catch_up.message}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
@@ -736,7 +753,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
               <button
                 key={o.id}
                 onClick={() => catchUp(o.id)}
-                className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold hover:border-brand"
+                className="border border-line px-3 py-1.5 text-xs font-semibold hover:border-brand"
               >
                 {o.label}
               </button>
@@ -745,10 +762,12 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-black tracking-tight">{plan.day_label}</h2>
-          <p className="text-sm text-mut">{plan.focus}</p>
+          <p className="font-display text-[11px] font-bold uppercase tracking-[0.28em] text-brand">Today</p>
+          <h2 className="mt-1 font-display text-2xl font-black tracking-tight sm:text-3xl">{plan.day_label}</h2>
+          <span className="ck-signal mt-2 max-w-[8rem]" />
+          <p className="mt-2 text-sm text-mut">{plan.focus}</p>
           {plan.goal_mode && (
             <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-brand">
               {plan.goal_mode} mode
@@ -758,8 +777,8 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
         {getSpeechRecognition() && (
           <button
             onClick={startVoice}
-            className={`h-11 w-11 shrink-0 rounded-full text-lg ${
-              listening ? "animate-pulse bg-brand text-white" : "border border-line hover:border-brand"
+            className={`h-11 w-11 shrink-0 text-lg ${
+              listening ? "animate-pulse bg-brand text-white" : "border border-ink hover:border-brand"
             }`}
             title="Log a set by voice"
           >
@@ -769,8 +788,8 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
       </div>
 
       {adapt && !needsCheckin && (
-        <div className={`mb-4 rounded-xl border p-3 text-sm ${
-          adapt.soft_day ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-panel"
+        <div className={`mb-4 border p-3 text-sm ${
+          adapt.soft_day ? "border-brand bg-brand/5" : "border-line bg-panel"
         }`}>
           <p className="font-semibold capitalize">
             Readiness: {adapt.status}
@@ -779,7 +798,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
           </p>
           <p className="mt-1 text-xs text-mut">{adapt.intensity_note}</p>
           {adapt.reasons?.[0] && (
-            <p className="mt-1 text-xs text-white/60">{adapt.reasons[0]}</p>
+            <p className="mt-1 text-xs text-mut">{adapt.reasons[0]}</p>
           )}
         </div>
       )}
@@ -816,7 +835,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
 
       {heard && <p className="mb-3 text-xs text-mut">Heard: "{heard}"</p>}
 
-      <div className="space-y-3">
+      <div>
         {plan.exercises.map((ex, i) => (
           <ExerciseCard key={`${ex.exercise}-${i}`} ex={ex} slot={i} onLog={logSet} onSwap={swap} />
         ))}

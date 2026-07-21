@@ -1,6 +1,6 @@
 /**
- * Public marketing landing — no API calls. Brand-first full-bleed hero,
- * then Dayan's story, then unlock to enter the app.
+ * Public marketing landing — Signal Strip (red + white).
+ * Brand-first full-bleed hero, then Dayan's story, then unlock.
  */
 
 import { useState } from "react";
@@ -29,32 +29,38 @@ export default function Landing({
   }
 
   return (
-    <div className="min-h-full overflow-y-auto">
-      {/* Hero — one composition: brand, headline, line, CTAs, full-bleed image */}
+    <div className="min-h-full overflow-y-auto bg-paper">
+      {/* Hero — brand, one line, CTAs, full-bleed image */}
       <section className="relative min-h-[100dvh] overflow-hidden">
         <img
           src={HERO}
           alt=""
           className="ck-hero-pan absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/80 to-ink/35" />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/75 to-ink/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/40 to-transparent" />
 
         <div className="relative flex min-h-[100dvh] flex-col justify-end px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-24 sm:px-10 sm:pb-16">
-          <p className="animate-rise ck-mark text-base sm:text-lg">COACH K</p>
-          <h1 className="animate-rise mt-4 max-w-2xl font-display text-4xl font-black leading-[0.95] tracking-tight delay-75 sm:text-6xl">
-            Train with a coach who shows up.
+          <p className="animate-rise font-display text-base font-extrabold tracking-[0.32em] text-white sm:text-lg">
+            COACH K
+          </p>
+          <span className="animate-rise ck-signal mt-4 max-w-xs bg-white delay-75" />
+          <h1 className="animate-rise mt-5 max-w-2xl font-display text-4xl font-black leading-[0.95] tracking-tight text-white delay-75 sm:text-6xl">
+            No noise. Just the next signal.
           </h1>
-          <p className="animate-rise mt-4 max-w-md text-base leading-relaxed text-white/80 delay-150 sm:text-lg">
-            Dayan Kijege — from the DRC to Austin. Science-grounded programming that adapts to you.
+          <p className="animate-rise mt-4 max-w-md text-base leading-relaxed text-white/90 delay-150 sm:text-lg">
+            Dayan Kijege — personal strength coaching. One session. One cue.
           </p>
           <div className="animate-rise mt-8 flex flex-wrap gap-3 delay-200">
-            <a href="#enter" className="ck-btn ck-btn-primary">
+            <a
+              href="#enter"
+              className="ck-btn bg-white text-brand hover:bg-paper"
+            >
               Enter Coach K
             </a>
             <a
               href="#story"
-              className="ck-btn ck-btn-ghost border-white/25 text-white hover:border-white/50"
+              className="ck-btn border-2 border-white text-white hover:bg-white/10"
             >
               My story
             </a>
@@ -62,10 +68,10 @@ export default function Landing({
         </div>
       </section>
 
-      {/* Portrait band — brand continuity before story */}
-      <section className="relative overflow-hidden border-b border-line/50">
+      {/* Portrait band */}
+      <section className="relative overflow-hidden border-b border-line">
         <div className="mx-auto grid max-w-5xl items-center gap-8 px-5 py-12 sm:grid-cols-[minmax(0,220px)_1fr] sm:px-8 sm:py-16">
-          <div className="relative mx-auto aspect-[3/4] w-48 overflow-hidden rounded-2xl sm:mx-0 sm:w-full">
+          <div className="relative mx-auto aspect-[3/4] w-48 overflow-hidden sm:mx-0 sm:w-full">
             <img
               src={SPEAKING}
               alt="Dayan Kijege — Coach K"
@@ -79,7 +85,8 @@ export default function Landing({
           </div>
           <div>
             <p className="ck-eyebrow">Coach</p>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight sm:text-4xl">
+            <span className="ck-signal-sm mt-3 max-w-[4rem]" />
+            <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
               Dayan Kijege
             </h2>
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-mut sm:text-base">
@@ -94,23 +101,17 @@ export default function Landing({
         document.getElementById("enter")?.scrollIntoView({ behavior: "smooth" });
       }} />
 
-      {/* Unlock — path into the app */}
-      <section
-        id="enter"
-        className="relative overflow-hidden border-t border-line/60"
-      >
-        <img
-          src="/images/hero-barbell.jpg"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/90 to-ink/70" />
+      {/* Unlock */}
+      <section id="enter" className="relative overflow-hidden border-t border-line bg-brand">
         <div className="relative mx-auto max-w-md px-5 py-16 sm:px-8 sm:py-20">
-          <p className="ck-eyebrow">Enter</p>
-          <h2 className="mt-3 font-display text-3xl font-black tracking-tight">
+          <p className="font-display text-[11px] font-bold uppercase tracking-[0.32em] text-white/80">
+            Enter
+          </p>
+          <span className="mt-3 block h-0.5 w-16 bg-white" />
+          <h2 className="mt-4 font-display text-3xl font-black tracking-tight text-white">
             Your training starts here.
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-mut">
+          <p className="mt-3 text-sm leading-relaxed text-white/85">
             Private access for athletes training with Coach K. Enter your password to open Today,
             chat, plans, and progress.
           </p>
@@ -124,14 +125,14 @@ export default function Landing({
               }}
               onKeyDown={(e) => e.key === "Enter" && unlock()}
               placeholder="Password"
-              className="ck-field"
+              className="ck-field border-white/30 bg-white text-ink"
               autoComplete="current-password"
             />
-            {err && <p className="mt-2 text-xs text-amber-300">{err}</p>}
+            {err && <p className="mt-2 text-xs text-white/90">{err}</p>}
             <button
               type="button"
               onClick={unlock}
-              className="ck-btn ck-btn-primary mt-4 w-full"
+              className="ck-btn mt-4 w-full bg-white text-brand hover:bg-paper"
             >
               Open Coach K
             </button>
@@ -139,7 +140,7 @@ export default function Landing({
         </div>
       </section>
 
-      <footer className="border-t border-line/40 px-5 py-8 text-center pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <footer className="border-t border-line bg-paper px-5 py-8 text-center pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <p className="ck-mark text-[11px]">COACH K</p>
         <p className="mt-2 text-[11px] text-mut">Dayan Kijege · Austin, TX</p>
       </footer>

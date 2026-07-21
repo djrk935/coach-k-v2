@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand: iron + signal red — athletic, not generic AI purple */
+  /* Signal Strip — red & white editorial athletics */
   --color-brand: #e11d2e;
   --color-brand-deep: #b01020;
-  --color-ink: #09090b;
-  --color-panel: #121216;
-  --color-elevated: #1a1a20;
-  --color-line: #2c2c34;
-  --color-mut: #8b8b94;
-  --color-fg: #f0f0f3;
-  --color-fg-dim: #c4c4cc;
+  --color-paper: #f7f7f5;
+  --color-ink: #0d0d0d;
+  --color-panel: #ffffff;
+  --color-elevated: #ffffff;
+  --color-line: #e4dfdf;
+  --color-mut: #6b6b66;
+  --color-fg: #0d0d0d;
+  --color-fg-dim: #3a3a38;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
 }
@@ -23,9 +24,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--font-sans);
   background:
-    radial-gradient(1000px 520px at 0% -5%, rgba(225, 29, 46, 0.14), transparent 55%),
-    radial-gradient(800px 480px at 100% 0%, rgba(255, 255, 255, 0.035), transparent 45%),
-    linear-gradient(180deg, #0c0c10 0%, var(--color-ink) 40%, #08080a 100%);
+    linear-gradient(180deg, #ffffff 0%, var(--color-paper) 55%, #f3f1ef 100%);
   color: var(--color-fg);
   overflow-x: hidden;
   letter-spacing: 0.01em;
@@ -33,13 +32,15 @@ body {
 
 .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
 
+/* Fine paper grain — barely there */
 body::before {
   content: "";
   pointer-events: none;
   position: fixed;
   inset: 0;
   z-index: 60;
-  opacity: 0.028;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -47,16 +48,17 @@ body::before {
   input, select, textarea { font-size: 16px !important; }
 }
 
-/* —— Shared UI primitives —— */
+/* —— Signal Strip primitives —— */
 .ck-surface {
-  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
-  border: 1px solid var(--color-line);
-  border-radius: 1rem;
+  background: var(--color-panel);
+  border: none;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
 }
 .ck-surface-elevated {
-  background: color-mix(in srgb, var(--color-elevated) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-line) 80%, #fff 8%);
-  border-radius: 1rem;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
 }
 .ck-eyebrow {
   font-family: var(--font-display);
@@ -66,52 +68,115 @@ body::before {
   text-transform: uppercase;
   color: var(--color-brand);
 }
+.ck-mark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--color-brand);
+}
+/* Namesake device — hard horizontal signal */
+.ck-signal {
+  display: block;
+  height: 3px;
+  width: 100%;
+  background: var(--color-brand);
+  border: none;
+  transform-origin: left center;
+  animation: signal-draw 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ck-signal-sm {
+  height: 2px;
+  animation: signal-draw 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 .ck-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border-radius: 0.75rem;
+  border-radius: 0;
   font-weight: 700;
   font-size: 0.875rem;
-  padding: 0.7rem 1.15rem;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease, filter 0.15s ease;
+  padding: 0.75rem 1.2rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 .ck-btn:active { transform: scale(0.98); }
 .ck-btn-primary {
   background: var(--color-brand);
   color: #fff;
 }
-.ck-btn-primary:hover { filter: brightness(1.08); }
-.ck-btn-primary:disabled { opacity: 0.4; filter: none; }
+.ck-btn-primary:hover { background: var(--color-brand-deep); }
+.ck-btn-primary:disabled { opacity: 0.4; }
 .ck-btn-ghost {
-  border: 1px solid var(--color-line);
-  color: var(--color-fg-dim);
+  border: 1.5px solid var(--color-ink);
+  color: var(--color-ink);
   background: transparent;
 }
 .ck-btn-ghost:hover {
-  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-line));
-  color: #fff;
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 .ck-field {
   width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-line);
-  background: var(--color-ink);
+  border-radius: 0;
+  border: 1.5px solid var(--color-line);
+  background: var(--color-panel);
   padding: 0.7rem 0.85rem;
   outline: none;
   color: var(--color-fg);
 }
 .ck-field:focus {
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(225, 29, 46, 0.18);
+  box-shadow: 0 0 0 3px rgba(225, 29, 46, 0.12);
 }
 .ck-field::placeholder { color: var(--color-mut); }
-.ck-mark {
+
+/* Scoreboard / ledger row */
+.ck-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-line);
+  animation: row-settle 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ck-cue {
+  background: var(--color-brand);
+  color: #fff;
+  padding: 0.85rem 1rem;
+}
+.ck-cue-label {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-size: 0.65rem;
+  font-weight: 700;
   letter-spacing: 0.28em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.ck-nav-tab {
+  position: relative;
+  border-radius: 0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mut);
+  transition: color 0.15s ease;
+}
+.ck-nav-tab:hover { color: var(--color-ink); }
+.ck-nav-tab[data-active="true"] {
   color: var(--color-brand);
+}
+.ck-nav-tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-brand);
 }
 
 @keyframes rise {
@@ -141,6 +206,16 @@ body::before {
   will-change: transform;
 }
 
+@keyframes signal-draw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes row-settle {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes pulse-ring {
   0% { box-shadow: 0 0 0 0 rgba(225, 29, 46, 0.45); }
   70% { box-shadow: 0 0 0 12px rgba(225, 29, 46, 0); }
@@ -157,5 +232,6 @@ body::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .animate-fade, .animate-pulse-ring, .ck-hero-pan { animation: none; }
+  .animate-rise, .animate-fade, .animate-pulse-ring, .ck-hero-pan,
+  .ck-signal, .ck-signal-sm, .ck-row { animation: none; }
 }

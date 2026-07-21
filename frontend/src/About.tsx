@@ -15,7 +15,7 @@ const HERO_FALLBACK = "/images/hero-barbell.jpg";
 
 export default function About({ onTalk }: { onTalk: () => void }) {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-paper">
       <section className="relative min-h-[70vh] overflow-hidden sm:min-h-[78vh]">
         <img
           src={SPEAKING_PHOTO}
@@ -27,15 +27,18 @@ export default function About({ onTalk }: { onTalk: () => void }) {
             else if (el.src.includes("coach-dayan")) el.src = HERO_FALLBACK;
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/75 to-ink/25" />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-ink/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand/85 via-transparent to-transparent" />
 
         <div className="relative flex min-h-[70vh] flex-col justify-end px-5 pb-10 pt-24 sm:min-h-[78vh] sm:px-10 sm:pb-14">
-          <p className="animate-rise ck-mark text-sm">COACH K</p>
-          <h1 className="animate-rise mt-3 max-w-xl font-display text-4xl font-black leading-[1.05] tracking-tight text-white delay-75 sm:text-6xl">
+          <p className="animate-rise font-display text-sm font-extrabold tracking-[0.32em] text-white">
+            COACH K
+          </p>
+          <span className="animate-rise mt-3 block h-0.5 w-20 bg-white delay-75" />
+          <h1 className="animate-rise mt-4 max-w-xl font-display text-4xl font-black leading-[1.05] tracking-tight text-white delay-75 sm:text-6xl">
             Dayan Kijege
           </h1>
-          <p className="animate-rise mt-4 max-w-lg text-base leading-relaxed text-white/80 delay-150 sm:text-lg">
+          <p className="animate-rise mt-4 max-w-lg text-base leading-relaxed text-white/90 delay-150 sm:text-lg">
             From the Democratic Republic of Congo to Austin — athlete, coach, and builder.
             I train with purpose and coach the same way.
           </p>
@@ -43,13 +46,13 @@ export default function About({ onTalk }: { onTalk: () => void }) {
             <button
               type="button"
               onClick={onTalk}
-              className="ck-btn ck-btn-primary"
+              className="ck-btn bg-white text-brand hover:bg-paper"
             >
               Talk to Coach K
             </button>
             <a
               href="#story"
-              className="ck-btn ck-btn-ghost border-white/25 text-white/90 hover:border-white/50"
+              className="ck-btn border-2 border-white text-white hover:bg-white/10"
             >
               My story
             </a>

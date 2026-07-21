@@ -22,9 +22,9 @@ export default function OfflineBanner() {
   return (
     <div
       role="status"
-      className="border-b border-amber-500/30 bg-amber-500/15 px-4 py-2 text-center text-[11px] font-semibold text-amber-100"
+      className="bg-brand px-4 py-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-white"
     >
-      You&apos;re offline — the app shell stays available. Live coaching syncs when you reconnect.
+      Offline — shell stays available. Coaching syncs when you reconnect.
     </div>
   );
 }

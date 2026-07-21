@@ -39,19 +39,21 @@ function LockScreen({
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/88 to-ink/40" />
-      <div className="absolute inset-0 bg-gradient-to-r from-ink/70 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/80 to-ink/45" />
+      <div className="absolute inset-0 bg-gradient-to-r from-brand/85 via-transparent to-transparent" />
       <div className="relative w-full max-w-md px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 sm:px-6 sm:pb-10">
-        <p className="animate-rise ck-mark text-sm">COACH K</p>
-        <h1 className="animate-rise mt-4 font-display text-4xl font-black leading-[0.95] tracking-tight delay-75 sm:text-5xl">
-          Train with a coach who shows up.
-        </h1>
-        <p className="animate-rise mt-4 max-w-sm text-[15px] leading-relaxed text-fg-dim delay-150">
-          Dayan Kijege — from the DRC to Austin. Science-grounded programming. Honest feedback.
-          Workouts that adapt to you.
+        <p className="animate-rise font-display text-sm font-extrabold tracking-[0.32em] text-white">
+          COACH K
         </p>
-        <div className="animate-rise ck-surface-elevated mt-8 p-5 backdrop-blur-md delay-200">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
+        <span className="animate-rise mt-3 block h-0.5 w-20 bg-white delay-75" />
+        <h1 className="animate-rise mt-4 font-display text-4xl font-black leading-[0.95] tracking-tight text-white delay-75 sm:text-5xl">
+          No noise. Just the next signal.
+        </h1>
+        <p className="animate-rise mt-4 max-w-sm text-[15px] leading-relaxed text-white/90 delay-150">
+          Dayan Kijege — science-grounded programming. Honest feedback. Workouts that adapt to you.
+        </p>
+        <div className="animate-rise mt-8 border border-white/30 bg-white p-5 delay-200">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
             Enter to continue
           </p>
           <input
@@ -72,7 +74,7 @@ function LockScreen({
             <button
               type="button"
               onClick={onBack}
-              className="mt-3 w-full py-2 text-xs font-semibold text-mut hover:text-white"
+              className="mt-3 w-full py-2 text-xs font-semibold text-mut hover:text-brand"
             >
               ← Back to landing
             </button>
@@ -107,7 +109,7 @@ function FormLookup() {
   }
 
   return (
-    <section className="rounded-xl border border-line/70 bg-panel p-4">
+    <section className="border-b border-line py-4">
       <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Form Check</h3>
       <div className="flex gap-2">
         <input
@@ -115,9 +117,9 @@ function FormLookup() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && lookup()}
           placeholder="e.g. Romanian Deadlift"
-          className="w-full min-w-0 flex-1 rounded-lg border border-line bg-ink px-3 py-2 text-sm outline-none placeholder:text-mut focus:border-brand"
+          className="ck-field min-w-0 flex-1 py-2 text-sm"
         />
-        <button onClick={lookup} className="rounded-lg bg-brand px-3 text-sm font-semibold text-white">
+        <button onClick={lookup} className="ck-btn ck-btn-primary px-3 py-2 text-xs">
           Go
         </button>
       </div>
@@ -145,8 +147,8 @@ function acwrTone(acwr: number | null) {
   if (acwr == null) return { label: "building baseline", cls: "text-mut" };
   if (acwr > 1.5) return { label: "spike — back off", cls: "text-brand" };
   if (acwr > 1.3) return { label: "elevated", cls: "text-amber-400" };
-  if (acwr < 0.8) return { label: "detraining", cls: "text-sky-400" };
-  return { label: "in the zone", cls: "text-emerald-400" };
+  if (acwr < 0.8) return { label: "detraining", cls: "text-sky-700" };
+  return { label: "in the zone", cls: "text-emerald-700" };
 }
 
 /** Shared dashboard panels — desktop sidebar + phone drawer. */
@@ -161,7 +163,7 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
 
   return (
     <>
-      <section className="rounded-xl border border-line/70 bg-panel p-4">
+      <section className="border-b border-line py-4">
         <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Training Load</h3>
         <div className="font-display text-3xl font-black">
           {acwr ?? "—"} <span className={`text-sm font-semibold ${tone.cls}`}>{tone.label}</span>
@@ -169,7 +171,7 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
         <p className="mt-1 text-xs text-mut">ACWR · {dash?.load?.sessions_28d ?? 0} sessions / 28d</p>
       </section>
 
-      <section className="rounded-xl border border-line/70 bg-panel p-4">
+      <section className="border-b border-line py-4">
         <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">
           Today's Readiness
         </h3>
@@ -190,7 +192,7 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
       </section>
 
       {Object.keys(oneRms).length > 0 && (
-        <section className="rounded-xl border border-line/70 bg-panel p-4">
+        <section className="border-b border-line py-4">
           <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">1RMs</h3>
           <ul className="space-y-1 text-sm">
             {Object.entries(oneRms).map(([lift, lbs]) => (
@@ -205,16 +207,16 @@ function DashPanels({ dash }: { dash: Dashboard | null }) {
 
       <FormLookup />
 
-      <section className="rounded-xl border border-line/70 bg-panel p-4">
+      <section className="border-b border-line py-4">
         <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-mut">Programs</h3>
         {dash?.programs?.length ? (
-          <ul className="space-y-2">
+          <ul className="divide-y divide-line">
             {dash.programs.map((p) => (
               <li key={p.id}>
                 <a
                   href={keyed(`/api/programs/${p.id}/pdf`)}
                   target="_blank"
-                  className="block rounded-lg border border-line px-3 py-2 text-sm hover:border-brand"
+                  className="block py-2.5 text-sm hover:text-brand"
                 >
                   <span className="font-semibold">{p.name}</span>
                   <span className="mt-0.5 block text-xs text-mut">
@@ -404,7 +406,7 @@ export default function App() {
   }
 
   if (booting) {
-    return <div className="h-full bg-ink" />;
+    return <div className="h-full bg-paper" />;
   }
 
   if (showLanding) {
@@ -444,7 +446,7 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
       {/* ===== Main column ===== */}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-line/70 bg-ink/55 px-3 py-2.5 pt-[calc(0.55rem+env(safe-area-inset-top))] backdrop-blur-xl sm:gap-3 sm:px-5 sm:py-3">
+        <header className="flex flex-wrap items-center gap-2 border-b border-line/70 bg-paper/95 px-3 py-2.5 pt-[calc(0.55rem+env(safe-area-inset-top))] backdrop-blur-xl sm:gap-3 sm:px-5 sm:py-3">
           <button
             onClick={() => setView("about")}
             className="ck-mark text-[13px] transition hover:brightness-110 sm:text-sm"
@@ -475,7 +477,7 @@ export default function App() {
             </div>
           )}
           <div className="flex-1" />
-          <nav className="flex gap-0.5 rounded-xl border border-line bg-panel/50 p-0.5">
+          <nav className="flex flex-wrap items-end gap-0.5 sm:gap-1">
             {([
               ["today", "today"],
               ["chat", "chat"],
@@ -487,9 +489,8 @@ export default function App() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-lg px-1.5 py-1.5 text-[10px] font-semibold capitalize transition sm:px-2.5 sm:text-xs ${
-                  view === v ? "bg-brand text-white" : "text-mut hover:text-white"
-                }`}
+                data-active={view === v}
+                className="ck-nav-tab sm:text-[0.7rem]"
               >
                 {label}
               </button>
@@ -498,14 +499,14 @@ export default function App() {
           {/* Phone/tablet: open the dashboard drawer (desktop uses the sidebar). */}
           <button
             onClick={() => setShowDash(true)}
-            className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand lg:hidden"
+            className="border border-ink px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand lg:hidden"
             title="Stats & tools"
           >
             Stats
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:border-brand"
+            className="border border-ink px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:border-brand hover:text-brand"
             title="Settings"
           >
             Settings
@@ -542,21 +543,22 @@ export default function App() {
           <>
             <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
               {msgs.length === 0 && (
-                <div className="animate-fade relative mx-auto mt-6 overflow-hidden rounded-2xl border border-line sm:mt-10">
+                <div className="animate-fade relative mx-auto mt-6 overflow-hidden sm:mt-10">
                   <img
                     src="/images/atmosphere-kettle.jpg"
                     alt=""
-                    className="absolute inset-0 h-full w-full object-cover opacity-40"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/80 to-ink/40" />
-                  <div className="relative px-6 py-14 text-center sm:py-20">
-                    <p className="font-display text-xs font-semibold tracking-[0.3em] text-brand">
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-ink/50" />
+                  <div className="relative px-6 py-14 text-left sm:py-20">
+                    <p className="font-display text-xs font-extrabold tracking-[0.32em] text-white">
                       COACH K
                     </p>
-                    <p className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
+                    <span className="mt-3 block h-0.5 w-16 bg-white" />
+                    <p className="mt-4 font-display text-2xl font-black tracking-tight text-white sm:text-3xl">
                       What are we training for?
                     </p>
-                    <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/70">
+                    <p className="mt-3 max-w-md text-sm leading-relaxed text-white/90">
                       Ask for a program, log a session, check in — or attach physique photos for an honest assessment.
                     </p>
                   </div>
@@ -567,8 +569,8 @@ export default function App() {
                   <div
                     className={
                       m.role === "user"
-                        ? "max-w-[88%] rounded-2xl rounded-br-sm bg-brand px-4 py-2.5 text-white sm:max-w-[70%]"
-                        : "max-w-[92%] rounded-2xl rounded-bl-sm border border-line/60 bg-panel px-4 py-2.5 sm:max-w-[85%]"
+                        ? "max-w-[88%] bg-brand px-4 py-2.5 text-white sm:max-w-[70%]"
+                        : "max-w-[92%] border border-line bg-panel px-4 py-2.5 sm:max-w-[85%]"
                     }
                     dangerouslySetInnerHTML={md(m.text || (busy && i === msgs.length - 1 ? "…" : ""))}
                   />
@@ -577,7 +579,7 @@ export default function App() {
               <div ref={bottomRef} />
             </div>
 
-            <footer className="border-t border-line/80 bg-ink/70 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-md sm:p-4">
+            <footer className="border-t border-line bg-paper p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-4">
               <div className="mx-auto w-full max-w-3xl">
                 {images.length > 0 && (
                   <div className="mb-2 flex gap-2 overflow-x-auto">
@@ -609,7 +611,7 @@ export default function App() {
                   <button
                     onClick={() => fileRef.current?.click()}
                     title="Attach physique photos"
-                    className="shrink-0 rounded-xl border border-line px-3 text-sm font-semibold text-mut hover:border-brand hover:text-white"
+                    className="ck-btn ck-btn-ghost shrink-0 px-3 text-xs"
                   >
                     Photo
                   </button>
@@ -618,12 +620,12 @@ export default function App() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && send()}
                     placeholder="Ask Coach K…"
-                    className="min-w-0 flex-1 rounded-xl border border-line bg-panel px-3 py-3 outline-none placeholder:text-mut focus:border-brand sm:px-4"
+                    className="ck-field min-w-0 flex-1 py-3 sm:px-4"
                   />
                   <button
                     onClick={send}
                     disabled={busy}
-                    className="shrink-0 rounded-xl bg-brand px-4 font-semibold text-white transition hover:brightness-110 disabled:opacity-40 sm:px-5"
+                    className="ck-btn ck-btn-primary shrink-0 disabled:opacity-40"
                   >
                     Send
                   </button>
@@ -643,11 +645,11 @@ export default function App() {
       {/* ===== Phone/tablet stats drawer ===== */}
       {showDash && (
         <div
-          className="fixed inset-0 z-40 flex justify-end bg-ink/80 lg:hidden"
+          className="fixed inset-0 z-40 flex justify-end bg-ink/40 lg:hidden"
           onClick={() => setShowDash(false)}
         >
           <div
-            className="flex h-full w-full max-w-sm flex-col border-l border-line bg-ink pt-[env(safe-area-inset-top)]"
+            className="flex h-full w-full max-w-sm flex-col border-l border-line bg-paper pt-[env(safe-area-inset-top)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">

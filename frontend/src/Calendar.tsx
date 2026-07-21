@@ -44,8 +44,8 @@ const KIND_STYLE: Record<string, string> = {
   rest: "border-line bg-panel/40",
   travel: "border-sky-500/40 bg-sky-500/10",
   game: "border-amber-400/40 bg-amber-400/10",
-  missed: "border-line/50 bg-ink/40 opacity-70",
-  completed: "border-emerald-500/30 bg-emerald-500/10",
+  missed: "border-line/50 bg-paper opacity-70",
+  completed: "border-emerald-500/30 bg-emerald-50",
   empty: "border-line/40 bg-transparent",
 };
 
@@ -137,7 +137,7 @@ export default function Calendar({ onOpenToday }: { onOpenToday?: () => void }) 
                 key={w}
                 onClick={() => setWeeks(w)}
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                  weeks === w ? "bg-brand text-white" : "text-mut hover:text-white"
+                  weeks === w ? "bg-brand text-white" : "text-mut hover:text-brand"
                 }`}
               >
                 {w}w
@@ -191,7 +191,7 @@ export default function Calendar({ onOpenToday }: { onOpenToday?: () => void }) 
                         : KIND_LABEL[d.kind]}
                     </p>
                     {d.completed && (
-                      <p className="mt-0.5 text-[9px] font-semibold text-emerald-400">Done</p>
+                      <p className="mt-0.5 text-[9px] font-semibold text-emerald-700">Done</p>
                     )}
                   </button>
                 );
@@ -203,7 +203,7 @@ export default function Calendar({ onOpenToday }: { onOpenToday?: () => void }) 
 
       {selected && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-ink/80 p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4"
           onClick={() => setSelected(null)}
         >
           <div
@@ -269,7 +269,7 @@ export default function Calendar({ onOpenToday }: { onOpenToday?: () => void }) 
 
             <button
               type="button"
-              className="mt-3 w-full py-2 text-sm text-mut hover:text-white"
+              className="mt-3 w-full py-2 text-sm text-mut hover:text-brand"
               onClick={() => setSelected(null)}
             >
               Close

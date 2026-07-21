@@ -155,13 +155,14 @@ export default function Progress() {
     return (
       <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6 text-center">
         <img src="/images/atmosphere-kettle.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/50" />
-        <div className="relative animate-rise max-w-sm">
-          <p className="ck-eyebrow">Progress</p>
-          <h2 className="mt-3 font-display text-2xl font-black tracking-tight">
+        <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/80 to-ink/45" />
+        <div className="relative animate-rise max-w-sm text-left">
+          <p className="font-display text-xs font-extrabold tracking-[0.32em] text-white">Progress</p>
+          <span className="mt-3 block h-0.5 w-16 bg-white" />
+          <h2 className="mt-4 font-display text-2xl font-black tracking-tight text-white">
             Log sessions to unlock your chart.
           </h2>
-          <p className="mt-2 text-sm text-mut">
+          <p className="mt-2 text-sm text-white/85">
             e1RM trends, bodyweight, readiness, and load appear here once you train and check in.
           </p>
         </div>
@@ -186,7 +187,8 @@ export default function Progress() {
     <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
       <div className="animate-fade">
         <p className="ck-eyebrow">Progress</p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+        <span className="ck-signal mt-2 max-w-[6rem]" />
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-display text-3xl font-black tracking-tight">Your numbers.</h1>
             <p className="mt-1 text-sm text-mut">
@@ -201,13 +203,13 @@ export default function Progress() {
             <button type="button" onClick={shareWeekly} className="ck-btn ck-btn-ghost py-1.5 text-xs">
               Weekly review
             </button>
-            <div className="flex gap-1 rounded-xl border border-line bg-panel/50 p-0.5">
+            <div className="flex gap-1 border border-line">
               {[30, 90, 180].map((d) => (
                 <button
                   key={d}
                   onClick={() => setDays(d)}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                    days === d ? "bg-brand text-white" : "text-mut hover:text-white"
+                  className={`px-2.5 py-1.5 text-xs font-semibold ${
+                    days === d ? "bg-brand text-white" : "text-mut hover:text-brand"
                   }`}
                 >
                   {d}d
@@ -229,8 +231,8 @@ export default function Progress() {
                 <button
                   key={k}
                   onClick={() => setLiftKey(k)}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold capitalize ${
-                    liftKey === k ? "bg-brand text-white" : "border border-line text-mut hover:text-white"
+                  className={`px-2.5 py-1 text-[11px] font-semibold capitalize ${
+                    liftKey === k ? "bg-brand text-white" : "border border-line text-mut hover:text-brand"
                   }`}
                 >
                   {LIFT_LABELS[k] || k}
@@ -280,7 +282,7 @@ export default function Progress() {
                     {LIFT_LABELS[k] || k}
                   </p>
                   <p className="mt-1 font-display text-lg font-black tabular-nums">{fmt(L.current)}</p>
-                  <p className={`text-[11px] ${L.delta >= 0 ? "text-emerald-400" : "text-brand"}`}>
+                  <p className={`text-[11px] ${L.delta >= 0 ? "text-emerald-700" : "text-brand"}`}>
                     {L.delta >= 0 ? "+" : ""}
                     {fmt(L.delta)}
                   </p>
