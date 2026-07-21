@@ -125,7 +125,7 @@ export default function Landing({
               }}
               onKeyDown={(e) => e.key === "Enter" && unlock()}
               placeholder="Password"
-              className="ck-field border-white/30 bg-white text-ink"
+              className="ck-field border-white/30 bg-white text-[#0d0d0d]"
               autoComplete="current-password"
             />
             {err && <p className="mt-2 text-xs text-white/90">{err}</p>}

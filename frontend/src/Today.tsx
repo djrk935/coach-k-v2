@@ -778,7 +778,7 @@ export default function Today({ onGoToTemplates }: { onGoToTemplates: () => void
           <button
             onClick={startVoice}
             className={`h-11 w-11 shrink-0 text-lg ${
-              listening ? "animate-pulse bg-brand text-white" : "border border-ink hover:border-brand"
+              listening ? "animate-pulse bg-brand text-white" : "border border-fg hover:border-brand"
             }`}
             title="Log a set by voice"
           >
